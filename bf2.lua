@@ -16,7 +16,7 @@ Options:
 ]]
 
 local output_header = [[
-#!/bin/env lua
+#!/usr/bin/env lua
 data = {}
 ptr = 1
 
@@ -28,7 +28,7 @@ read_brainfuck = function(file)
 	local program = {}
 	
 	repeat
-		command = file:read(1)
+		local command = file:read(1)
 
 		if command ~= fail and string.match(command, "[<>%+%-%.,%[%]]") ~= fail then
 			program[#program+1] = command
@@ -41,7 +41,7 @@ end
 -- removes useless sequences of commands from a brainfuck program
 optimise_brainfuck = function(program)
 	
-	local substitutions = {["<>"] = "", ["><"] = "", ["%+%-"] = "", ["%-%+"] = "", ["%[%]"] = ""}
+	local substitutions = {["<>"] = "", ["><"] = "", ["%+%-"] = "", ["%-%+"] = ""}
 	local sum = 0
 	
 	repeat
