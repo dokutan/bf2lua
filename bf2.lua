@@ -19,12 +19,12 @@ local output_header = [[
 #!/usr/bin/env lua
 data = {}
 ptr = 1
+max = 256
 
 ]]
 
 -- read brainfuck code from file
 read_brainfuck = function(file)
-
     local program = {}
 
     repeat
@@ -40,12 +40,15 @@ end
 
 -- removes useless sequences of commands from a brainfuck program
 optimise_brainfuck = function(program)
+    program = string.gsub(program, "[^><%+%-.,%]%[]", "")
 
     local substitutions = {
         ["<>"] = "",
         ["><"] = "",
         ["%+%-"] = "",
-        ["%-%+"] = ""
+        ["%-%+"] = "",
+        ["%[%-%]"] = "0",
+        ["%[%+%]"] = "0"
     }
     local sum = 0
 
@@ -62,7 +65,6 @@ end
 
 -- counts the number of unmatched loop commands, should return 0 for a valid program
 count_brainfuck_loops = function(program)
-
     local loops = 0
 
     for i = 1, #program do
@@ -80,7 +82,6 @@ end
 
 -- converts Brainfuck code to Lua code
 convert_brainfuck = function(program, output)
-
     local loops = 0
     local counter = 1
 
@@ -106,8 +107,8 @@ convert_brainfuck = function(program, output)
                 counter = counter + 1
             else
                 output:write(string.rep("\t", loops) ..
-                                 "data[ptr] = ((data[ptr] and data[ptr]) or 0) + " ..
-                                 counter .. "\n")
+                                 "data[ptr] = (((data[ptr] and data[ptr]) or 0) + " ..
+                                 counter .. ") % max\n")
                 counter = 1
             end
         elseif string.sub(program, i, i) == "-" then
@@ -115,8 +116,8 @@ convert_brainfuck = function(program, output)
                 counter = counter + 1
             else
                 output:write(string.rep("\t", loops) ..
-                                 "data[ptr] = ((data[ptr] and data[ptr]) or 0) - " ..
-                                 counter .. "\n")
+                                 "data[ptr] = (((data[ptr] and data[ptr]) or 0) - " ..
+                                 counter .. ") % max\n")
                 counter = 1
             end
         elseif string.sub(program, i, i) == "<" then
@@ -135,6 +136,8 @@ convert_brainfuck = function(program, output)
                                  counter .. "\n")
                 counter = 1
             end
+        elseif string.sub(program, i, i) == "0" then
+            output:write(string.rep("\t", loops) .. "data[ptr] = 0\n")
         end
 
         if loops < 0 then break end
@@ -143,7 +146,6 @@ end
 
 -- main function
 main = function()
-
     local infile = nil -- input filename
     local outfile = nil -- output filename
     local bfcode = "" -- Brainfuck code
@@ -188,6 +190,7 @@ main = function()
         input:close()
     end
 
+    -- optimise brainfuck code
     bfcode = optimise_brainfuck(bfcode)
 
     -- check for unmatched loops
@@ -218,6 +221,8 @@ main = function()
             os.exit(1)
         end
     end
+
+    -- convert brainfuck to lua and write to output
     convert_brainfuck(bfcode, output)
     output:close()
 
@@ -226,7 +231,6 @@ main = function()
         dofile(outfile)
         os.remove(outfile)
     end
-
 end
 
 main()
