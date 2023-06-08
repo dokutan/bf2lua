@@ -85,59 +85,56 @@ convert_brainfuck = function(program, output)
     local loops = 0
     local counter = 1
 
-    output:write(output_header)
+    local output_write = function(str)
+        output:write(string.rep("\t", loops) .. str)
+    end
+
+    output_write(output_header)
 
     for i = 1, #program do
 
         if string.sub(program, i, i) == "[" then
-            output:write(string.rep("\t", loops) ..
-                             "while ((data[ptr] and data[ptr]) or 0) ~= 0 do\n")
+            output_write("while (data[ptr] or 0) ~= 0 do\n")
             loops = loops + 1
         elseif string.sub(program, i, i) == "]" then
+            output_write("end\n")
             loops = loops - 1
-            output:write(string.rep("\t", loops) .. "end\n")
         elseif string.sub(program, i, i) == "," then
-            output:write(string.rep("\t", loops) ..
-                             "data[ptr] = string.byte(io.read(1))\n")
+            output_write("data[ptr] = string.byte(io.read(1))\n")
         elseif string.sub(program, i, i) == "." then
-            output:write(string.rep("\t", loops) ..
-                             "io.write(string.char((data[ptr] and data[ptr]) or 0))\n")
+            output_write("io.write(string.char(data[ptr] or 0))\n")
         elseif string.sub(program, i, i) == "+" then
             if string.sub(program, i + 1, i + 1) == "+" then
                 counter = counter + 1
             else
-                output:write(string.rep("\t", loops) ..
-                                 "data[ptr] = (((data[ptr] and data[ptr]) or 0) + " ..
-                                 counter .. ") % max\n")
+                output_write("data[ptr] = ((data[ptr] or 0) + " .. counter ..
+                                 ") % max\n")
                 counter = 1
             end
         elseif string.sub(program, i, i) == "-" then
             if string.sub(program, i + 1, i + 1) == "-" then
                 counter = counter + 1
             else
-                output:write(string.rep("\t", loops) ..
-                                 "data[ptr] = (((data[ptr] and data[ptr]) or 0) - " ..
-                                 counter .. ") % max\n")
+                output_write("data[ptr] = ((data[ptr] or 0) - " .. counter ..
+                                 ") % max\n")
                 counter = 1
             end
         elseif string.sub(program, i, i) == "<" then
             if string.sub(program, i + 1, i + 1) == "<" then
                 counter = counter + 1
             else
-                output:write(string.rep("\t", loops) .. "ptr = ptr - " ..
-                                 counter .. "\n")
+                output_write("ptr = ptr - " .. counter .. "\n")
                 counter = 1
             end
         elseif string.sub(program, i, i) == ">" then
             if string.sub(program, i + 1, i + 1) == ">" then
                 counter = counter + 1
             else
-                output:write(string.rep("\t", loops) .. "ptr = ptr + " ..
-                                 counter .. "\n")
+                output_write("ptr = ptr + " .. counter .. "\n")
                 counter = 1
             end
         elseif string.sub(program, i, i) == "0" then
-            output:write(string.rep("\t", loops) .. "data[ptr] = 0\n")
+            output_write("data[ptr] = 0\n")
         end
 
         if loops < 0 then break end
