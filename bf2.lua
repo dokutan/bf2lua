@@ -83,7 +83,8 @@ end
 -- converts Brainfuck code to Lua code
 convert_brainfuck = function(program, output)
     local loops = 0
-    local counter = 1
+    local counter = 1 -- used to count and join repeating commands
+    local skipped_zero = false -- indicates if zeroing a cell has been omitted from the output
 
     local output_write = function(str)
         output:write(string.rep("\t", loops) .. str)
@@ -106,6 +107,10 @@ convert_brainfuck = function(program, output)
         elseif string.sub(program, i, i) == "+" then
             if string.sub(program, i + 1, i + 1) == "+" then
                 counter = counter + 1
+            elseif skipped_zero then
+                output_write("data[ptr] = " .. counter .. " % max\n")
+                counter = 1
+                skipped_zero = false
             else
                 output_write("data[ptr] = ((data[ptr] or 0) + " .. counter ..
                                  ") % max\n")
@@ -114,6 +119,10 @@ convert_brainfuck = function(program, output)
         elseif string.sub(program, i, i) == "-" then
             if string.sub(program, i + 1, i + 1) == "-" then
                 counter = counter + 1
+            elseif skipped_zero then
+                output_write("data[ptr] = -" .. counter .. " % max\n")
+                counter = 1
+                skipped_zero = false
             else
                 output_write("data[ptr] = ((data[ptr] or 0) - " .. counter ..
                                  ") % max\n")
@@ -134,7 +143,12 @@ convert_brainfuck = function(program, output)
                 counter = 1
             end
         elseif string.sub(program, i, i) == "0" then
-            output_write("data[ptr] = 0\n")
+            if string.sub(program, i + 1, i + 1) == "+" or
+               string.sub(program, i + 1, i + 1) == "-" then
+                skipped_zero = true
+            else
+                output_write("data[ptr] = 0\n")
+            end
         end
 
         if loops < 0 then break end
