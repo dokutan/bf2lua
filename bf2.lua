@@ -97,8 +97,8 @@ convert_brainfuck = function(program, output)
             output_write("while (data[ptr] or 0) ~= 0 do\n")
             loops = loops + 1
         elseif string.sub(program, i, i) == "]" then
-            output_write("end\n")
             loops = loops - 1
+            output_write("end\n")
         elseif string.sub(program, i, i) == "," then
             output_write("data[ptr] = string.byte(io.read(1))\n")
         elseif string.sub(program, i, i) == "." then
