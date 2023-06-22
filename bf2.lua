@@ -56,7 +56,7 @@ optimise_brainfuck = function(program)
 
         -- the current cell is guaranteed to be zero after a loop
         ["%]0"] = "]",
-        ["%]0"] = "]",
+        ["%]0"] = "]"
     }
     local sum = 0
 
@@ -88,75 +88,112 @@ count_brainfuck_loops = function(program)
     return loops
 end
 
--- converts Brainfuck code to Lua code
-convert_brainfuck = function(program, output)
+-- converts Brainfuck code to an intermediate representation
+convert_brainfuck = function(program)
     local loops = 0
     local counter = 1 -- used to count and join repeating commands
     local skipped_zero = false -- indicates if zeroing a cell has been omitted from the output
-
-    local output_write = function(str)
-        output:write(string.rep("\t", loops) .. str)
-    end
-
-    output_write(output_header)
+    local ir = {}
 
     for i = 1, #program do
 
         if string.sub(program, i, i) == "[" then
-            output_write("while (data[ptr] or 0) ~= 0 do\n")
+            -- output_write("while (data[ptr] or 0) ~= 0 do\n")
+            ir[#ir + 1] = {"[", loops}
             loops = loops + 1
         elseif string.sub(program, i, i) == "]" then
             loops = loops - 1
-            output_write("end\n")
+            ir[#ir + 1] = {"]", loops}
         elseif string.sub(program, i, i) == "," then
-            output_write("data[ptr] = string.byte(io.read(1))\n")
+            ir[#ir + 1] = {",", loops}
         elseif string.sub(program, i, i) == "." then
-            output_write("io.write(string.char(data[ptr] or 0))\n")
+            ir[#ir + 1] = {".", loops}
         elseif string.sub(program, i, i) == "+" then
             if string.sub(program, i + 1, i + 1) == "+" then
                 counter = counter + 1
             elseif skipped_zero then
-                output_write("data[ptr] = " .. counter .. " % max\n")
+                ir[#ir + 1] = {"=", loops, counter}
                 counter = 1
                 skipped_zero = false
             else
-                output_write("data[ptr] = ((data[ptr] or 0) + " .. counter ..
-                                 ") % max\n")
+                ir[#ir + 1] = {"+", loops, counter}
                 counter = 1
             end
         elseif string.sub(program, i, i) == "-" then
             if string.sub(program, i + 1, i + 1) == "-" then
                 counter = counter + 1
             elseif skipped_zero then
-                output_write("data[ptr] = -" .. counter .. " % max\n")
+                ir[#ir + 1] = {"=", loops, -counter}
                 counter = 1
                 skipped_zero = false
             else
-                output_write("data[ptr] = ((data[ptr] or 0) - " .. counter ..
-                                 ") % max\n")
+                ir[#ir + 1] = {"-", loops, counter}
                 counter = 1
             end
         elseif string.sub(program, i, i) == "<" then
             if string.sub(program, i + 1, i + 1) == "<" then
                 counter = counter + 1
             else
-                output_write("ptr = ptr - " .. counter .. "\n")
+                ir[#ir + 1] = {"<", loops, counter}
                 counter = 1
             end
         elseif string.sub(program, i, i) == ">" then
             if string.sub(program, i + 1, i + 1) == ">" then
                 counter = counter + 1
             else
-                output_write("ptr = ptr + " .. counter .. "\n")
+                ir[#ir + 1] = {">", loops, counter}
                 counter = 1
             end
         elseif string.sub(program, i, i) == "0" then
             if string.sub(program, i + 1, i + 1) == "+" or
-               string.sub(program, i + 1, i + 1) == "-" then
+                string.sub(program, i + 1, i + 1) == "-" then
+                -- setting this cell to zero can be skipped, because the value will be set with the next instruction
                 skipped_zero = true
             else
-                output_write("data[ptr] = 0\n")
+                ir[#ir + 1] = {"0", loops}
             end
+        end
+
+        if loops < 0 then break end
+    end
+
+    return ir
+end
+
+-- converts the intermediate representation to Lua code
+convert_ir = function(ir, output)
+    output:write(output_header)
+
+    for i = 1, #ir do
+        local command = ir[i][1]
+        local loops = ir[i][2]
+
+        local output_write = function(str)
+            output:write(string.rep("\t", loops) .. str)
+        end
+
+        if command == "[" then
+            output_write("while (data[ptr] or 0) ~= 0 do\n")
+        elseif command == "]" then
+            output_write("end\n")
+        elseif command == "," then
+            output_write("data[ptr] = string.byte(io.read(1))\n")
+        elseif command == "." then
+            output_write("io.write(string.char(data[ptr] or 0))\n")
+        elseif command == "+" then
+            output_write("data[ptr] = ((data[ptr] or 0) + " .. ir[i][3] ..
+                             ") % max\n")
+        elseif command == "-" then
+            output_write("data[ptr] = ((data[ptr] or 0) - " .. ir[i][3] ..
+                             ") % max\n")
+        elseif command == "<" then
+            output_write("ptr = ptr - " .. ir[i][3] .. "\n")
+        elseif command == ">" then
+            output_write("ptr = ptr + " .. ir[i][3] .. "\n")
+        elseif command == "0" then
+            output_write("data[ptr] = 0\n")
+        elseif command == "=" then
+            output_write("data[ptr] = " .. ir[i][3] .. " % max\n")
         end
 
         if loops < 0 then break end
@@ -168,6 +205,7 @@ main = function()
     local infile = nil -- input filename
     local outfile = nil -- output filename
     local bfcode = "" -- Brainfuck code
+    local ir = {} -- intermediate representation
     local output -- output file
     local run = false
 
@@ -211,6 +249,7 @@ main = function()
 
     -- optimise brainfuck code
     bfcode = optimise_brainfuck(bfcode)
+    ir = convert_brainfuck(bfcode)
 
     -- check for unmatched loops
     local loops = count_brainfuck_loops(bfcode)
@@ -242,7 +281,7 @@ main = function()
     end
 
     -- convert brainfuck to lua and write to output
-    convert_brainfuck(bfcode, output)
+    convert_ir(ir, output)
     output:close()
 
     -- run output
