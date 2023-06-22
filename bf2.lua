@@ -40,15 +40,23 @@ end
 
 -- removes useless sequences of commands from a brainfuck program
 optimise_brainfuck = function(program)
+    -- remove all characters that are not brainfuck commands
     program = string.gsub(program, "[^><%+%-.,%]%[]", "")
 
     local substitutions = {
+        -- these pairs of commands have no effect
         ["<>"] = "",
         ["><"] = "",
         ["%+%-"] = "",
         ["%-%+"] = "",
+
+        -- these loops set the current cell to zero
         ["%[%-%]"] = "0",
-        ["%[%+%]"] = "0"
+        ["%[%+%]"] = "0",
+
+        -- the current cell is guaranteed to be zero after a loop
+        ["%]0"] = "]",
+        ["%]0"] = "]",
     }
     local sum = 0
 
