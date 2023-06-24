@@ -30,3 +30,10 @@ lua bf2lua -O 2 -i input.bf
 - Successive identical commands are combined into a single line of Lua code
 - Simple loops (e.g. setting a cell to zero, addition) are replaced
 - The total number of loop commands (``[`` and ``]``) is checked to be balanced
+
+
+## Documentation
+Documentation can be generated with ldoc:
+```
+ldoc bf2.lua -a -f markdown
+```
