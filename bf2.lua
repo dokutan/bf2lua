@@ -18,6 +18,7 @@ Options:
 -O --optimize 0-2 optimization level
 -f --functions    create a function for each loop
                   this improves compatibility with luajit and lua<5.4
+-g --debug        Enable the '#' command, which prints debug info to stderr
 ]]
 
 local output_header = [[
@@ -27,6 +28,20 @@ ptr = 1
 max = 256
 
 setmetatable(data, {__index = function() return 0 end})
+
+]]
+
+local debug_header = [[
+function bf_debug()
+    io.stderr:write(ptr .. ": ")
+    for i = -8, 8 do
+		if i == 0 then io.stderr:write("[") end
+		io.stderr:write(string.format("%03d", data[ptr+i] or 0))
+		if i == 0 then io.stderr:write("]") end
+		io.stderr:write(" ")
+	end
+    io.stderr:write("\n")
+end
 
 ]]
 
@@ -48,7 +63,7 @@ local read_brainfuck = function(file)
     repeat
         local command = file:read(1)
 
-        if command ~= nil and string.match(command, "[<>%+%-%.,%[%]]") ~= nil then
+        if command ~= nil and string.match(command, "[<>%+%-%.,%[%]#]") ~= nil then
             program[#program + 1] = command
         end
     until command == nil -- EOF
@@ -61,9 +76,12 @@ end
 --- @tparam string program brainfuck program
 --- @tparam int optimization optimization level
 --- @treturn string optimized brainfuck program
-local function optimize_brainfuck(program, optimization)
+local function optimize_brainfuck(program, optimization, debugging)
     -- remove all characters that are not brainfuck commands
-    program = string.gsub(program, "[^><%+%-.,%]%[]", "")
+    program = string.gsub(program, "[^><%+%-.,%]%[#]", "")
+    if not debugging then
+        program = string.gsub(program, "#", "")
+    end
 
     if optimization < 1 then
         return program
@@ -131,6 +149,7 @@ end
 --- * {">", indentation depth, value} (move ptr by value)
 --- * {"add-to", indentation depth, "+" or "-", ptr offset, ptr offset 2}
 --- * {"move-to", indentation depth, value, ptr offset, ptr offset 2}
+--- * {"#", indentation depth} call bf_debug
 --- @tparam string program brainfuck program
 --- @treturn table intermediate representation
 local convert_brainfuck = function(program)
@@ -195,6 +214,8 @@ local convert_brainfuck = function(program)
             else
                 ir[#ir + 1] = { "=", loops, 0, 0 }
             end
+        elseif string.sub(program, i, i) == "#" then
+            ir[#ir + 1] = { "#", loops }
         end
 
         if loops < 0 then break end
@@ -496,7 +517,8 @@ end
 --- @tparam table ir intermediate representation
 --- @tparam file output output file
 --- @tparam boolean functions whether to generate functions for loops
-local convert_ir = function(ir, output, functions)
+--- @tparam boolean debugging whether to generate calls to bf_debug
+local convert_ir = function(ir, output, functions, debugging)
     local ptr_offset = function(offset)
         if offset == 0 then
             return ""
@@ -510,6 +532,9 @@ local convert_ir = function(ir, output, functions)
     local function_names = {}
 
     output:write(output_header)
+    if debugging then
+        output:write(debug_header)
+    end
 
     for i = 1, #ir do
         local command = ir[i][1]
@@ -565,6 +590,8 @@ local convert_ir = function(ir, output, functions)
                 "data[ptr" .. ptr_offset(ir[i][4]) .. "] = (" .. ir[i][3] ..
                 " + data[ptr" .. ptr_offset(ir[i][5]) .. "]) % max\n"
             )
+        elseif command == "#" and debugging then
+            output_write("bf_debug()\n")
         end
 
         if loops < 0 then break end
@@ -581,6 +608,7 @@ local main = function()
     local run = false       -- run the output ?
     local functions = false -- use functions in the output ?
     local optimization = 1  -- optimization level
+    local debugging = false -- enable debugging
 
     -- parse commandline args
     for i = 1, #arg do
@@ -610,6 +638,8 @@ local main = function()
             end
         elseif arg[i] == "-f" or arg[i] == "--functions" then
             functions = true
+        elseif arg[i] == "-g" or arg[i] == "--debug" then
+            debugging = true
         end
     end
 
@@ -640,7 +670,7 @@ local main = function()
     end
 
     -- optimize brainfuck code
-    bfcode = optimize_brainfuck(bfcode, optimization)
+    bfcode = optimize_brainfuck(bfcode, optimization, debugging)
     ir = convert_brainfuck(bfcode)
     local ir_length = #ir + 1
     while #ir ~= ir_length do
@@ -669,7 +699,7 @@ local main = function()
     end
 
     -- convert intermediate representation to lua and write to output
-    convert_ir(ir, output, functions)
+    convert_ir(ir, output, functions, debugging)
     if output ~= nil then
         output:close()
     end
