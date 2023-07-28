@@ -18,14 +18,16 @@ Options:
 -O --optimize 0-2 optimization level
 -f --functions    create a function for each loop
                   this improves compatibility with luajit and lua<5.4
--g --debug        Enable the '#' command, which prints debug info to stderr
+-g --debug        enable the '#' command, which prints debug info to stderr
+-m --maximum      set the maximum value of a cell, default is 255 = 8-bit cells
+                  use 0 to disable wrapping cells
 ]]
 
 local output_header = [[
 #!/usr/bin/env lua
 data = {}
 ptr = 1
-max = 256
+max = %d
 
 setmetatable(data, {__index = function() return 0 end})
 
@@ -120,17 +122,9 @@ end
 --- @tparam string program brainfuck program
 --- @treturn int the number of unmatched loop commands
 local function count_brainfuck_loops(program)
-    local loops = 0
-
-    for i = 1, #program do
-        if string.sub(program, i, i) == "[" then
-            loops = loops + 1
-        elseif string.sub(program, i, i) == "]" then
-            loops = loops - 1
-        end
-    end
-
-    return loops
+    local _, count_open = string.gsub(program, "%[", "[")
+    local _, count_close = string.gsub(program, "%[", "[")
+    return count_open - count_close
 end
 
 --- Converts Brainfuck code to an intermediate representation.
@@ -518,7 +512,7 @@ end
 --- @tparam file output output file
 --- @tparam boolean functions whether to generate functions for loops
 --- @tparam boolean debugging whether to generate calls to bf_debug
-local convert_ir = function(ir, output, functions, debugging)
+local convert_ir = function(ir, output, functions, debugging, maximum)
     local ptr_offset = function(offset)
         if offset == 0 then
             return ""
@@ -530,8 +524,12 @@ local convert_ir = function(ir, output, functions, debugging)
     end
     local function_counter = 1
     local function_names = {}
+    local mod_max = " % max"
+    if maximum == 0 then
+        mod_max = ""
+    end
 
-    output:write(output_header)
+    output:write(output_header:format(maximum + 1))
     if debugging then
         output:write(debug_header)
     end
@@ -562,33 +560,33 @@ local convert_ir = function(ir, output, functions, debugging)
         elseif command == "." then
             output_write(
                 "io.write(string.char((data[ptr" .. ptr_offset(ir[i][4]) .. "]" ..
-                ptr_offset(ir[i][3] or 0) .. ") % max))\n"
+                ptr_offset(ir[i][3] or 0) .. ")" .. mod_max .. "))\n"
             )
         elseif command == "+" then
             output_write(
                 "data[ptr" .. ptr_offset(ir[i][4]) ..
-                "] = (data[ptr" .. ptr_offset(ir[i][4]) .. "] + " .. ir[i][3] .. ") % max\n"
+                "] = (data[ptr" .. ptr_offset(ir[i][4]) .. "] + " .. ir[i][3] .. ")" .. mod_max .. "\n"
             )
         elseif command == "-" then
             output_write(
                 "data[ptr" .. ptr_offset(ir[i][4]) ..
-                "] = (data[ptr" .. ptr_offset(ir[i][4]) .. "] - " .. ir[i][3] .. ") % max\n"
+                "] = (data[ptr" .. ptr_offset(ir[i][4]) .. "] - " .. ir[i][3] .. ")" .. mod_max .. "\n"
             )
         elseif command == "<" then
             output_write("ptr = ptr - " .. ir[i][3] .. "\n")
         elseif command == ">" then
             output_write("ptr = ptr + " .. ir[i][3] .. "\n")
         elseif command == "=" then
-            output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = " .. ir[i][3] .. " % max\n")
+            output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = " .. ir[i][3] .. mod_max .. "\n")
         elseif command == "add-to" then
             output_write(
                 "data[ptr" .. ptr_offset(ir[i][4]) .. "] = (data[ptr" .. ptr_offset(ir[i][4]) .. "] " ..
-                ir[i][3] .. " data[ptr" .. ptr_offset(ir[i][5]) .. "]) % max\n"
+                ir[i][3] .. " data[ptr" .. ptr_offset(ir[i][5]) .. "])" .. mod_max .. "\n"
             )
         elseif command == "move-to" then
             output_write(
                 "data[ptr" .. ptr_offset(ir[i][4]) .. "] = (" .. ir[i][3] ..
-                " + data[ptr" .. ptr_offset(ir[i][5]) .. "]) % max\n"
+                " + data[ptr" .. ptr_offset(ir[i][5]) .. "])" .. mod_max .. "\n"
             )
         elseif command == "#" and debugging then
             output_write("bf_debug()\n")
@@ -609,9 +607,11 @@ local main = function()
     local functions = false -- use functions in the output ?
     local optimization = 1  -- optimization level
     local debugging = false -- enable debugging
+    local maximum = 255     -- maximum value of a cell
 
     -- parse commandline args
-    for i = 1, #arg do
+    local i = 1
+    while i <= #arg do
         if arg[i] == "-h" or arg[i] == "--help" then
             io.write(help_message)
             os.exit(0)
@@ -621,6 +621,7 @@ local main = function()
                 os.exit(1)
             else
                 infile = tostring(arg[i + 1])
+                i = i + 1
             end
         elseif arg[i] == "-o" or arg[i] == "--output" then
             if arg[i + 1] == nil then
@@ -628,6 +629,7 @@ local main = function()
                 os.exit(1)
             else
                 outfile = tostring(arg[i + 1])
+                i = i + 1
             end
         elseif arg[i] == "-O" or arg[i] == "--optimize" then
             if arg[i + 1] == nil then
@@ -635,12 +637,25 @@ local main = function()
                 os.exit(1)
             else
                 optimization = tonumber(arg[i + 1]) or optimization
+                i = i + 1
             end
+        elseif arg[i] == "-m" or arg[i] == "--maximum" then
+        if arg[i + 1] == nil then
+            print("Option " .. arg[i] .. " requires an argument")
+            os.exit(1)
+        else
+            maximum = tonumber(arg[i + 1]) or maximum
+            i = i + 1
+        end
         elseif arg[i] == "-f" or arg[i] == "--functions" then
             functions = true
         elseif arg[i] == "-g" or arg[i] == "--debug" then
             debugging = true
+        else
+            print("Unknown option " .. arg[i])
+            os.exit(1)
         end
+        i = i + 1
     end
 
     -- read input
@@ -699,7 +714,7 @@ local main = function()
     end
 
     -- convert intermediate representation to lua and write to output
-    convert_ir(ir, output, functions, debugging)
+    convert_ir(ir, output, functions, debugging, maximum)
     if output ~= nil then
         output:close()
     end
