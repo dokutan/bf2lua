@@ -25,9 +25,9 @@ Options:
 
 local output_header = [[
 #!/usr/bin/env lua
-data = {}
-ptr = 1
-max = %d
+local data = {}
+local ptr = 1
+local max = %d
 
 setmetatable(data, {__index = function() return 0 end})
 
