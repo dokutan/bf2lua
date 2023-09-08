@@ -79,7 +79,7 @@ end
 --- @treturn int the number of unmatched loop commands
 bf_utils.count_brainfuck_loops = function(program)
     local _, count_open = string.gsub(program, "%[", "[")
-    local _, count_close = string.gsub(program, "%[", "[")
+    local _, count_close = string.gsub(program, "%]", "]")
     return count_open - count_close
 end
 
