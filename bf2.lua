@@ -167,7 +167,7 @@ local main = function()
     end
 
     -- convert intermediate representation to lua and write to output
-    bf_utils.convert_ir(ir, output, functions, debugging, maximum, output_header, debug_header)
+    output:write(bf_utils.convert_ir(ir, functions, debugging, maximum, output_header, debug_header))
     if output ~= nil then
         output:close()
     end

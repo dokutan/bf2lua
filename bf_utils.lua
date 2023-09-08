@@ -466,14 +466,13 @@ end
 
 --- Converts the intermediate representation to Lua code.
 ---
---- The resulting Lua code is written to `output`.
 --- @tparam table ir intermediate representation
---- @tparam file output output file
 --- @tparam boolean functions whether to generate functions for loops
 --- @tparam boolean debugging whether to generate calls to bf_debug
 --- @tparam string header that defines data, ptr, ...
 --- @tparam string header that defines bf_debug()
-bf_utils.convert_ir = function(ir, output, functions, debugging, maximum, output_header, debug_header)
+--- @treturn string Lua code
+bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header, debug_header)
     local ptr_offset = function(offset)
         if offset == 0 then
             return ""
@@ -490,9 +489,9 @@ bf_utils.convert_ir = function(ir, output, functions, debugging, maximum, output
         mod_max = ""
     end
 
-    output:write(output_header:format(maximum + 1))
+    local lua_code = output_header:format(maximum + 1)
     if debugging then
-        output:write(debug_header)
+        lua_code = lua_code .. debug_header
     end
 
     for i = 1, #ir do
@@ -500,7 +499,7 @@ bf_utils.convert_ir = function(ir, output, functions, debugging, maximum, output
         local loops = ir[i][2]
 
         local output_write = function(str)
-            output:write(string.rep("\t", loops) .. str)
+            lua_code = lua_code .. string.rep("\t", loops) .. str
         end
 
         if command == "[" then
@@ -555,6 +554,8 @@ bf_utils.convert_ir = function(ir, output, functions, debugging, maximum, output
 
         if loops < 0 then break end
     end
+
+    return lua_code
 end
 
 return bf_utils
