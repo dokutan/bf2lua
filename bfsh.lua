@@ -32,6 +32,11 @@ max = 256
 setmetatable(data, {__index = function() return 0 end})
 printlua = false
 trace = nil
+input = nil
+
+local unescape = function(str)
+    return str:gsub("\\n", "\n"):gsub("\\0", "\0"):gsub("\\\\", "\\")
+end
 
 local run_brainfuck = function(command, prompt, functions, optimization, debugging, maximum)
     local loops = bf_utils.count_brainfuck_loops(command)
@@ -41,26 +46,36 @@ local run_brainfuck = function(command, prompt, functions, optimization, debuggi
     end
 
     if loops < 0 then
-        print("error")
+        print(colors.red .. "unmatched ]" .. colors.reset)
         return
     end
 
     RL.add_history(command)
+    io.stdin:setvbuf("no")
 
+    -- convert brainfuck to Lua
     local bf_code = bf_utils.optimize_brainfuck(command, optimization, debugging)
     local ir = bf_utils.convert_brainfuck(bf_code)
     local lua_code = bf_utils.convert_ir(ir, functions, debugging, maximum, "", "")
+
+    -- modify Lua code
     if trace then
         lua_code = "trace[#trace + 1] = ptr\n" .. lua_code
         lua_code = lua_code:gsub("(ptr = [^\n]*)", "%1; trace[#trace + 1] = ptr")
     end
+    if input then
+        lua_code = lua_code:gsub("(string.byte%(io.read%(%d*%)%))", "string.byte(input) or 0; input = input:sub(2)")
+    end
+
+    -- run Lua code
+    if printlua then print(colors.yellow .. lua_code .. colors.reset) end
     local bf_fn = load(lua_code)
     if bf_fn then
-        if printlua then print(colors.yellow .. lua_code .. colors.reset) end
+        io.write(colors.magenta)
         bf_fn()
+        io.write(colors.reset)
     else
-        if printlua then print(colors.yellow .. lua_code .. colors.reset) end
-        print("error")
+        print(colors.red .. "failed to load lua code" .. colors.reset)
     end
 
     io.flush()
@@ -74,7 +89,9 @@ local run_command = function(command)
         ptr = tonumber(command:gmatch("%a+%s+(%d+)")())
     elseif command == "reset" then
         data = {}
+        setmetatable(data, {__index = function() return 0 end})
         ptr = 1
+        trace = nil
     elseif command == "get" then
         print(data[ptr], ((data[ptr] >= 32 and data[ptr] <= 126) and string.char(data[ptr]) or ""))
     elseif command:match("set%s+%d+") then
@@ -107,6 +124,12 @@ local run_command = function(command)
             end
             trace = nil
         end
+    elseif command:match("echo%s+.*") or command == "echo" then
+        print(colors.yellow .. unescape(command:gsub("^%a+%s*", "")) .. colors.reset)
+    elseif command == "input" then
+        input = nil
+    elseif command:match("input%s+.*") then
+        input = unescape(command:gsub("^%a+%s*", ""))
     elseif command == "help" then
         print([[Enter brainfuck code or a command, available commands:
 
@@ -120,6 +143,8 @@ data
 help
 printlua on|off
 trace on|off
+echo [TEXT]
+input [TEXT]
         ]])
     else
         print(colors.red .. "unknown or wrong command" .. colors.reset)
@@ -179,7 +204,9 @@ local main = function()
 
         if command == nil then
             break -- EOF
-        elseif string.match(command, "^%s*[a-zA-Z]") then
+        elseif command:match("^%s*//") then
+            -- comment, do nothing
+        elseif command:match("^%s*[a-zA-Z]") then
             run_command(command)
         else
             run_brainfuck(command, prompt, functions, optimization, debugging, maximum)
