@@ -157,14 +157,23 @@ local main = function()
     local optimization = 0  -- optimization level
     local debugging = false -- enable debugging
     local maximum = 255     -- maximum value of a cell
+    local infile = nil
     local default_prompt = "> "
 
     -- parse commandline args
     local i = 1
     while i <= #arg do
         if arg[i] == "-h" or arg[i] == "--help" then
-            io.write(help_message)
+            io.write("help_message")
             os.exit(0)
+        elseif arg[i] == "-i" or arg[i] == "--input" then
+            if arg[i + 1] == nil then
+                print(colors.red .. "Option " .. arg[i] .. " requires an argument" .. colors.reset)
+                os.exit(1)
+            else
+                infile = tostring(arg[i + 1])
+                i = i + 1
+            end
         elseif arg[i] == "-O" or arg[i] == "--optimize" then
             if arg[i + 1] == nil then
                 print(colors.red .. "Option " .. arg[i] .. " requires an argument" .. colors.reset)
@@ -192,8 +201,19 @@ local main = function()
         i = i + 1
     end
 
-    print("\x1b[1;96mbfsh - brainfuck shell")
-    print("Enter `help` for a list of commands\x1b[0m")
+    if not infile then
+        print("\x1b[1;96mbfsh - brainfuck shell")
+        print("Enter `help` for a list of commands\x1b[0m")
+    else
+        local f, message = io.open(infile)
+        if not f then
+            print(colors.red .. "Failed to open " .. infile .. ": " .. message .. colors.reset)
+            os.exit(1)
+        end
+        RL.readline = function(_)
+            return f:read()
+        end
+    end
 
     -- REPL
     local command = ""
