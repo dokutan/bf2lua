@@ -168,8 +168,6 @@ bf_utils.convert_brainfuck = function(program)
         elseif string.sub(program, i, i) == "#" then
             ir[#ir + 1] = { "#", loops }
         end
-
-        if loops < 0 then break end
     end
 
     return ir
@@ -551,8 +549,6 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
         elseif command == "#" and debugging then
             output_write("bf_debug()\n")
         end
-
-        if loops < 0 then break end
     end
 
     return lua_code
