@@ -5,7 +5,7 @@
 local bf_utils = require("bf_utils")
 local has_readline, RL = pcall(function() return require("readline") end)
 
--- readline fallback
+--- readline fallback
 if not has_readline then
     print("Install the readline module for a better experience.")
     RL = {}
@@ -15,6 +15,11 @@ if not has_readline then
     end
     RL.add_history = function(_) end
     RL.set_readline_name = function(_) end
+end
+
+--- unescape `str`
+local unescape = function(str)
+    return str:gsub("\\n", "\n"):gsub("\\0", "\0"):gsub("\\\\", "\\")
 end
 
 --- Colors
@@ -34,88 +39,60 @@ printlua = false
 trace = nil
 input = nil
 
-local unescape = function(str)
-    return str:gsub("\\n", "\n"):gsub("\\0", "\0"):gsub("\\\\", "\\")
-end
+--- Shell commands
+commands = {}
+--setmetatable(data, {__index = function() print(colors.red .. "unknown command" .. colors.reset) end})
 
-local run_brainfuck = function(command, prompt, functions, optimization, debugging, maximum)
-    local loops = bf_utils.count_brainfuck_loops(command)
-    while loops > 0 do
-        command = command .. "\n" .. RL.readline(loops .. prompt)
-        loops = bf_utils.count_brainfuck_loops(command)
-    end
-
-    if loops < 0 then
-        print(colors.red .. "unmatched ]" .. colors.reset)
-        return
-    end
-
-    RL.add_history(command)
-    io.stdin:setvbuf("no")
-
-    -- convert brainfuck to Lua
-    local bf_code = bf_utils.optimize_brainfuck(command, optimization, debugging)
-    local ir = bf_utils.convert_brainfuck(bf_code)
-    local lua_code = bf_utils.convert_ir(ir, functions, debugging, maximum, "", "")
-
-    -- modify Lua code
-    if trace then
-        lua_code = "trace[#trace + 1] = ptr\n" .. lua_code
-        lua_code = lua_code:gsub("(ptr = [^\n]*)", "%1; trace[#trace + 1] = ptr")
-    end
-    if input then
-        lua_code = lua_code:gsub("(string.byte%(io.read%(%d*%)%))", "string.byte(input) or 0; input = input:sub(2)")
-    end
-
-    -- run Lua code
-    if printlua then print(colors.yellow .. lua_code .. colors.reset) end
-    local bf_fn = load(lua_code)
-    if bf_fn then
-        io.write(colors.magenta)
-        bf_fn()
-        io.write(colors.reset)
+function commands.ptr(arg)
+    if arg:match("%d+") then
+        ptr = tonumber(arg)
     else
-        print(colors.red .. "failed to load lua code" .. colors.reset)
+        print(ptr)
     end
-
-    io.flush()
 end
 
-local run_command = function(command)
-    command = command:gsub("^%s", ""):gsub("%s$", "")
-    if command == "ptr" then
-        print(ptr)
-    elseif command:match("ptr%s+%d+") then
-        ptr = tonumber(command:gmatch("%a+%s+(%d+)")())
-    elseif command == "reset" then
-        data = {}
-        setmetatable(data, {__index = function() return 0 end})
-        ptr = 1
-        trace = nil
-    elseif command == "get" then
-        print(data[ptr], ((data[ptr] >= 32 and data[ptr] <= 126) and string.char(data[ptr]) or ""))
-    elseif command:match("set%s+%d+") then
-        data[ptr] = tonumber(command:gmatch("%a+%s+(%d+)")()) % max
-    elseif command:match("inc%s+%d+") then
-        data[ptr] = (data[ptr] + tonumber(command:gmatch("%a+%s+(%d+)")())) % max
-    elseif command:match("dec%s+%d+") then
-        data[ptr] = (data[ptr] - tonumber(command:gmatch("%a+%s+(%d+)")())) % max
-    elseif command == "data" then
-        io.write(ptr .. ": ")
-        for i = -8, 8 do
-            if i == 0 then io.write("[") end
-            io.write(string.format("%03d", data[ptr+i] or 0))
-            if i == 0 then io.write("]") end
-            io.write(" ")
-        end
-        io.write("\n")
-    elseif command:match("printlua%son") then
-        printlua = true
-    elseif command:match("printlua%s+off") then
-        printlua = false
-    elseif command:match("trace%son") then
+function commands.reset(_)
+    data = {}
+    setmetatable(data, {__index = function() return 0 end})
+    ptr = 1
+    trace = nil
+end
+
+function commands.echo(arg)
+    print(colors.yellow .. unescape(arg) .. colors.reset)
+end
+
+function commands.get(_)
+    print(data[ptr], ((data[ptr] >= 32 and data[ptr] <= 126) and string.char(data[ptr]) or ""))
+end
+
+function commands.set(arg)
+    data[ptr] = tonumber(arg) % max
+end
+
+function commands.inc(arg)
+    data[ptr] = data[ptr] + tonumber(arg) % max
+end
+
+function commands.dec(arg)
+    data[ptr] = data[ptr] - tonumber(arg) % max
+end
+
+function commands.data(_)
+    io.write(ptr .. ": ")
+    for i = -8, 8 do
+        if i == 0 then io.write("[") end
+        io.write(string.format("%03d", data[ptr+i] or 0))
+        if i == 0 then io.write("]") end
+        io.write(" ")
+    end
+    io.write("\n")
+end
+
+function commands.trace(arg)
+    if arg == "on" then
         trace = {}
-    elseif command:match("trace%s+off") then
+    elseif arg == "off" then
         if not trace then
             print(colors.red .. "no trace started" .. colors.reset)
         else
@@ -124,14 +101,27 @@ local run_command = function(command)
             end
             trace = nil
         end
-    elseif command:match("echo%s+.*") or command == "echo" then
-        print(colors.yellow .. unescape(command:gsub("^%a+%s*", "")) .. colors.reset)
-    elseif command == "input" then
+    end
+end
+
+function commands.printlua(arg)
+    if arg == "on" then
+        printlua = true
+    elseif arg == "off" then
+        printlua = false
+    end
+end
+
+function commands.input(arg)
+    if arg == "" then
         input = nil
-    elseif command:match("input%s+.*") then
-        input = unescape(command:gsub("^%a+%s*", ""))
-    elseif command == "help" then
-        print([[Enter brainfuck code or a command, available commands:
+    else
+        input = unescape(arg)
+    end
+end
+
+function commands.help(_)
+    print([[Enter brainfuck code or a command, available commands:
 
 ptr [VALUE]
 reset
@@ -144,11 +134,93 @@ help
 printlua on|off
 trace on|off
 echo [TEXT]
-input [TEXT]
-        ]])
-    else
-        print(colors.red .. "unknown or wrong command" .. colors.reset)
+input [TEXT] ]])
+end
+
+local run = function(command, prompt, functions, optimization, debugging, maximum)
+    -- split command into lines
+    local command_lines = {}
+    command = command .. "\n"
+    for line in command:gmatch("[^\n]*\n") do
+        line = line:gsub("\n", "")
+
+        table.insert(command_lines, line)
     end
+
+    -- filter brainfuck lines (needed to count the loops)
+    local bf_command_lines = {}
+    for _, line in ipairs(command_lines) do
+        if not line:match("^%s*[a-zA-Z]") then
+            table.insert(bf_command_lines, line)
+        end
+    end
+
+    -- count loops in brainfuck, read more lines if unmatched [
+    local loops = bf_utils.count_brainfuck_loops(table.concat(bf_command_lines))
+    while loops > 0 do
+        local line = RL.readline(loops .. prompt)
+
+        -- add line to command
+        command = command .. line .. "\n"
+        table.insert(command_lines, line)
+        if not line:match("^%s*[a-zA-Z]") then
+            table.insert(bf_command_lines, line)
+        end
+
+        loops = bf_utils.count_brainfuck_loops(table.concat(bf_command_lines))
+    end
+
+    if loops < 0 then
+        print(colors.red .. "unmatched ]" .. colors.reset)
+        return
+    end
+
+    -- add command to history
+    RL.add_history(command:gsub("\n$", ""))
+
+    -- convert lines to lua
+    local lua_lines = {}
+    for _, line in ipairs(command_lines) do
+        if line:match("^%s*//") then
+            -- comment
+        elseif not line:match("^%s*[a-zA-Z]") then
+            -- convert brainfuck to Lua
+            local bf_code = bf_utils.optimize_brainfuck(line, optimization, debugging)
+            local ir = bf_utils.convert_brainfuck(bf_code)
+            local lua_code = bf_utils.convert_ir(ir, functions, debugging, maximum, "", "")
+
+            -- modify Lua code
+            if trace then
+                lua_code = "trace[#trace + 1] = ptr\n" .. lua_code
+                lua_code = lua_code:gsub("(ptr = [^\n]*)", "%1; trace[#trace + 1] = ptr")
+            end
+            if input then
+                lua_code = lua_code:gsub("(string.byte%(io.read%(%d*%)%))", "string.byte(input) or 0; input = input:sub(2)")
+            end
+
+            table.insert(lua_lines, lua_code)
+        else
+            -- shell command
+            local command_name, command_arg = line:gmatch("%s*([a-zA-Z]+)(.*)")()
+            command_arg = command_arg:gsub("^%s*", ""):gsub("%s*$", ""):gsub("\\", "\\\\"):gsub('"', '\\"')
+            local lua_code = "commands." .. command_name .. '("' .. command_arg .. '")'
+            table.insert(lua_lines, lua_code)
+        end
+    end
+
+    -- run Lua code
+    local lua_code = table.concat(lua_lines, "\n")
+    if printlua then print(colors.yellow .. lua_code .. colors.reset) end
+    local bf_fn = load(lua_code)
+    if bf_fn then
+        io.write(colors.magenta)
+        bf_fn()
+        io.write(colors.reset)
+        io.flush()
+    else
+        print(colors.red .. "failed to load lua code" .. colors.reset)
+    end
+
 end
 
 --- Main function.
@@ -226,10 +298,8 @@ local main = function()
             break -- EOF
         elseif command:match("^%s*//") then
             -- comment, do nothing
-        elseif command:match("^%s*[a-zA-Z]") then
-            run_command(command)
         else
-            run_brainfuck(command, prompt, functions, optimization, debugging, maximum)
+            run(command, prompt, functions, optimization, debugging, maximum)
         end
     end
 end
