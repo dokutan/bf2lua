@@ -41,7 +41,7 @@ input = nil
 
 --- Shell commands
 commands = {}
---setmetatable(data, {__index = function() print(colors.red .. "unknown command" .. colors.reset) end})
+setmetatable(commands, {__index = function() return function() print(colors.red .. "unknown command" .. colors.reset) end end})
 
 function commands.ptr(arg)
     if arg:match("%d+") then
@@ -64,6 +64,10 @@ end
 
 function commands.get(_)
     print(data[ptr], ((data[ptr] >= 32 and data[ptr] <= 126) and string.char(data[ptr]) or ""))
+end
+
+function commands.getdouble(_)
+    print(data[ptr] + data[ptr+3] * 256)
 end
 
 function commands.set(arg)
@@ -211,14 +215,14 @@ local run = function(command, prompt, functions, optimization, debugging, maximu
     -- run Lua code
     local lua_code = table.concat(lua_lines, "\n")
     if printlua then print(colors.yellow .. lua_code .. colors.reset) end
-    local bf_fn = load(lua_code)
+    local bf_fn, message = load(lua_code)
     if bf_fn then
         io.write(colors.magenta)
         bf_fn()
         io.write(colors.reset)
         io.flush()
     else
-        print(colors.red .. "failed to load lua code" .. colors.reset)
+        print(colors.red .. "failed to load lua code\n" .. message .. colors.reset)
     end
 
 end
