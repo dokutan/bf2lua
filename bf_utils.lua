@@ -1,3 +1,6 @@
+--- brainfuck utilities
+-- @module bf_utils
+
 local bf_utils = {}
 
 local function is_in(key, set)
@@ -32,6 +35,7 @@ end
 --- Adds the '0' command to set a cell to zero.
 --- @tparam string program brainfuck program
 --- @tparam int optimization optimization level
+--- @tparam bool debugging enable the debugging command: '#'
 --- @treturn string optimized brainfuck program
 bf_utils.optimize_brainfuck = function(program, optimization, debugging)
     -- remove all characters that are not brainfuck commands
@@ -467,8 +471,9 @@ end
 --- @tparam table ir intermediate representation
 --- @tparam boolean functions whether to generate functions for loops
 --- @tparam boolean debugging whether to generate calls to bf_debug
---- @tparam string header that defines data, ptr, ...
---- @tparam string header that defines bf_debug()
+--- @tparam int maximum maximum value of a brainfuck cell
+--- @tparam string output_header header that defines `data`, `ptr`, ...
+--- @tparam string debug_header header that defines `bf_debug()`
 --- @treturn string Lua code
 bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header, debug_header)
     local ptr_offset = function(offset)

@@ -1,6 +1,7 @@
 #!/usr/bin/env lua
 
 --- Brainfuck to Lua transpiler
+-- @script bf2lua
 
 local bf_utils = require("bf_utils")
 

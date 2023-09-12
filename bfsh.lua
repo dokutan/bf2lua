@@ -1,11 +1,12 @@
 #!/usr/bin/env lua
 
 --- Brainfuck shell
+-- @script bfsh
 
 local bf_utils = require("bf_utils")
 local has_readline, RL = pcall(function() return require("readline") end)
 
---- readline fallback
+-- readline fallback
 if not has_readline then
     print("Install the readline module for a better experience.")
     RL = {}
