@@ -15,6 +15,7 @@ if not has_readline then
     end
     RL.add_history = function(_) end
     RL.set_readline_name = function(_) end
+    RL.set_complete_list = function(_) end
 end
 
 --- unescape `str`
@@ -290,6 +291,13 @@ local main = function()
             return f:read()
         end
     end
+
+    -- command completion
+    local completions = {}
+    for name, _ in pairs(commands) do
+        table.insert(completions, name)
+    end
+    RL.set_complete_list(completions)
 
     -- REPL
     local command = ""
