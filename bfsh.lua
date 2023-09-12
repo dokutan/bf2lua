@@ -24,6 +24,17 @@ local unescape = function(str)
     return str:gsub("\\n", "\n"):gsub("\\0", "\0"):gsub("\\\\", "\\")
 end
 
+local help_message = [[
+bfsh.lua - brainfuck shell
+
+Options:
+-h --help         print this message
+-i --input FILE   input file, - for stdin
+-f --functions    create a function for each loop
+                  this improves compatibility with luajit and lua<5.4
+]]
+
+
 --- Colors
 local colors = {
     reset = "\x1b[0m",
@@ -129,18 +140,20 @@ end
 function commands.help(_)
     print([[Enter brainfuck code or a command, available commands:
 
-ptr [VALUE]
-reset
-get
-set VALUE
-inc VALUE
-dec VALUE
-data
-help
-printlua on|off
-trace on|off
-echo [TEXT]
-input [TEXT] ]])
+help             show this message
+ptr [VALUE]      set pointer to value, print pointer if VALUE is empty
+reset            reset the brainfuck state
+get              print value of the current cell
+getdouble        print value of the current doubled cell (>low,0,0,high)
+set VALUE        set current cell to VALUE
+inc VALUE        increment current cell by VALUE
+dec VALUE        decrement current cell by VALUE
+data             print memory around the pointer
+printlua on|off  print lua code
+trace on|off     trace pointer movement
+echo [TEXT]      print TEXT
+input [TEXT]     use TEXT as brainfuck input, use stdin if TEXT is empty
+]])
 end
 
 local run = function(command, prompt, functions, optimization, debugging, maximum)
@@ -219,9 +232,9 @@ local run = function(command, prompt, functions, optimization, debugging, maximu
     if printlua then print(colors.yellow .. lua_code .. colors.reset) end
     local bf_fn, message = load(lua_code)
     if bf_fn then
-        io.write(colors.magenta)
+        --io.write(colors.magenta)
         bf_fn()
-        io.write(colors.reset)
+        --io.write(colors.reset)
         io.flush()
     else
         print(colors.red .. "failed to load lua code\n" .. message .. colors.reset)
@@ -242,7 +255,7 @@ local main = function()
     local i = 1
     while i <= #arg do
         if arg[i] == "-h" or arg[i] == "--help" then
-            io.write("help_message")
+            print(help_message)
             os.exit(0)
         elseif arg[i] == "-i" or arg[i] == "--input" then
             if arg[i + 1] == nil then
@@ -252,26 +265,8 @@ local main = function()
                 infile = tostring(arg[i + 1])
                 i = i + 1
             end
-        elseif arg[i] == "-O" or arg[i] == "--optimize" then
-            if arg[i + 1] == nil then
-                print(colors.red .. "Option " .. arg[i] .. " requires an argument" .. colors.reset)
-                os.exit(1)
-            else
-                optimization = tonumber(arg[i + 1]) or optimization
-                i = i + 1
-            end
-        elseif arg[i] == "-m" or arg[i] == "--maximum" then
-            if arg[i + 1] == nil then
-                print(colors.red .. "Option " .. arg[i] .. " requires an argument" .. colors.reset)
-                os.exit(1)
-            else
-                max = tonumber(arg[i + 1]) + 1 or maximum
-                i = i + 1
-            end
         elseif arg[i] == "-f" or arg[i] == "--functions" then
             functions = true
-        elseif arg[i] == "-g" or arg[i] == "--debug" then
-            debugging = true
         else
             print(colors.red .. "Unknown option " .. arg[i] .. colors.reset)
             os.exit(1)
