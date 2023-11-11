@@ -83,6 +83,20 @@ function commands.getdouble(_)
     print(data[ptr] + data[ptr+3] * 256)
 end
 
+function commands.getstring(arg)
+    for i=0,tonumber(arg) do
+        io.write("\\" .. data[ptr+i])
+        -- if data[ptr+i] == 10 then
+        --     io.write("\\n")
+        -- elseif data[ptr+i] < 32 or data[ptr+i] > 126 then
+        --     io.write("\\" .. data[ptr+i])
+        -- else
+        --     io.write(string.char(data[ptr+i]))
+        -- end
+    end
+    print()
+end
+
 function commands.set(arg)
     data[ptr] = tonumber(arg) % max
 end
