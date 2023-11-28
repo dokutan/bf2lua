@@ -519,7 +519,7 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
                 output_write("end\n")
             end
         elseif command == "," then
-            output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = string.byte(io.read(1))\n")
+            output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = string.byte(io.read(1) or 0)\n")
         elseif command == "." then
             output_write(
                 "io.write(string.char((data[ptr" .. ptr_offset(ir[i][4]) .. "]" ..
