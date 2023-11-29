@@ -18,7 +18,7 @@ Options:
 -h --help         print this message
 -i --input FILE   input file, - for stdin
 -o --output FILE  output file, - for stdout
--O --optimize 0-2 optimization level
+-O --optimize 0-2 optimization level, the default is 1
 -f --functions    create a function for each loop
                   this improves compatibility with luajit and lua<5.4
 -g --debug        enable the '#' command, which prints debug info to stderr
