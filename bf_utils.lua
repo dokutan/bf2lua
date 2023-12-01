@@ -95,6 +95,7 @@ end
 ---
 --- * {"[", indentation depth}
 --- * {"]", indentation depth}
+--- * {"if", indentation depth}
 --- * {",", indentation depth, nil, ptr offset}
 --- * {".", indentation depth, value offset, ptr offset} (add value offset + value of cell at ptr + ptr offset)
 --- * {"+", indentation depth, value, ptr offset} (add value to cell at ptr + ptr offset)
@@ -463,6 +464,31 @@ bf_utils.optimize_ir = function(ir, optimization)
             optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3], ir[i + 1][4] }
             optimized_ir[#optimized_ir + 1] = { ir[i][1], ir[i][2], ir[i][3], ir[i][4] }
             i = i + 2
+        elseif -- while → if
+            ir[i][1] == "["
+        then
+            local correct_instructions = true
+            local current_cell_zero = false
+            for j = i+1, #ir do
+                if ir[j][1] == "]" then
+                    break
+                elseif not is_in(ir[j][1], { "+", "-", "=", "." }) then
+                    correct_instructions = false
+                    break
+                elseif is_in(ir[j][1], { "+", "-", "=", "." }) and ir[j][3] ~= 0 and ir[j][4] == 0 then
+                    correct_instructions = false
+                    break
+                elseif ir[j][1] == "=" and ir[j][3] == 0 and ir[j][4] == 0 then
+                    current_cell_zero = true
+                end
+            end
+
+            if correct_instructions and current_cell_zero then
+                optimized_ir[#optimized_ir + 1] = { "if", ir[i][2] }
+            else
+                optimized_ir[#optimized_ir + 1] = ir[i]
+            end
+            i = i + 1
         else -- no optimisation applicable
             optimized_ir[#optimized_ir + 1] = ir[i]
             i = i + 1
@@ -519,6 +545,13 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
 
         if command == "[" then
             output_write("while data[ptr] ~= 0 do\n")
+            if functions then
+                output_write("function loop" .. function_counter .. "()\n")
+                function_names[loops] = function_counter
+                function_counter = function_counter + 1
+            end
+        elseif command == "if" then
+            output_write("if data[ptr] ~= 0 do\n")
             if functions then
                 output_write("function loop" .. function_counter .. "()\n")
                 function_names[loops] = function_counter
