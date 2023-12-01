@@ -278,6 +278,18 @@ bf_utils.optimize_ir = function(ir, optimization)
             optimized_ir[#optimized_ir + 1] = { "add-to", ir[i][2], "+", ir[i + 1][4], 0 }
             optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], 0, 0 }
             i = i + 4
+        elseif -- addition → "add-to"
+            ir[i][1] == "[" and
+            ir[i + 1][1] == "-" and
+            ir[i + 2][1] == "+" and
+            ir[i + 3][1] == "]" and
+            ir[i + 1][3] == 1 and -- increment by one
+            ir[i + 2][3] == 1 and -- decrement by one
+            ir[i + 1][4] == 0     -- current cell is decremented
+        then
+            optimized_ir[#optimized_ir + 1] = { "add-to", ir[i][2], "+", ir[i + 2][4], 0 }
+            optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], 0, 0 }
+            i = i + 4
         elseif -- addition to two cells → "add-to"
             ir[i][1] == "[" and
             ir[i + 1][1] == "+" and
@@ -305,13 +317,13 @@ bf_utils.optimize_ir = function(ir, optimization)
             optimized_ir[#optimized_ir + 1] = { "add-to", ir[i][2], "-", ir[i + 1][4], 0 }
             optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], 0, 0 }
             i = i + 4
-        elseif -- = and add-to → move-to
-            ir[i][1] == "=" and
-            ir[i + 1][1] == "add-to" and
-            ir[i][4] == ir[i + 1][4] -- both commands act on the same cell
-        then
-            optimized_ir[#optimized_ir + 1] = { "move-to", ir[i][2], ir[i][3], ir[i + 1][4], ir[i + 1][5] }
-            i = i + 2
+        -- elseif -- = and add-to → move-to -- TODO this causes problems, does not care about +/- from add-to
+        --     ir[i][1] == "=" and
+        --     ir[i + 1][1] == "add-to" and
+        --     ir[i][4] == ir[i + 1][4] -- both commands act on the same cell
+        -- then
+        --     optimized_ir[#optimized_ir + 1] = { "move-to", ir[i][2], ir[i][3], ir[i + 1][4], ir[i + 1][5] }
+        --     i = i + 2
         elseif -- = and move-to → = and =
             ir[i][1] == "=" and
             ir[i + 1][1] == "move-to" and
@@ -540,7 +552,11 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
         elseif command == ">" then
             output_write("ptr = ptr + " .. ir[i][3] .. "\n")
         elseif command == "=" then
-            output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = " .. ir[i][3] .. mod_max .. "\n")
+            if maximum > 0 then
+                output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = " .. (ir[i][3] % maximum) .. "\n") -- TODO! add option to disable this
+            else
+                output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = " .. ir[i][3] .. mod_max .. "\n")
+            end
         elseif command == "add-to" then
             output_write(
                 "data[ptr" .. ptr_offset(ir[i][4]) .. "] = (data[ptr" .. ptr_offset(ir[i][4]) .. "] " ..
