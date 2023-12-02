@@ -252,73 +252,34 @@ bf_utils.optimize_ir = function(ir, optimization)
             optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3], ir[i + 1][4] - ir[i][3] }
             optimized_ir[#optimized_ir + 1] = { "<", ir[i][2], ir[i][3] }
             i = i + 2
-        elseif -- swap > with add-to
+        elseif -- swap > with add-to2
             ir[i][1] == ">" and
-            ir[i + 1][1] == "add-to"
+            ir[i + 1][1] == "add-to2"
         then
-            optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3], ir[i + 1][4] + ir[i][3],
-                ir[i + 1][5] + ir[i][3] }
+            optimized_ir[#optimized_ir + 1] = { "add-to2", ir[i + 1][2], ir[i + 1][3], ir[i + 1][4], ir[i + 1][5] + ir[i][3], ir[i + 1][6] + ir[i][3] }
             optimized_ir[#optimized_ir + 1] = { ">", ir[i][2], ir[i][3] }
             i = i + 2
-        elseif -- swap < with add-to
+        elseif -- swap < with add-to2
             ir[i][1] == "<" and
-            ir[i + 1][1] == "add-to"
+            ir[i + 1][1] == "add-to2"
         then
-            optimized_ir[#optimized_ir + 1] = { "add-to", ir[i + 1][2], ir[i + 1][3], ir[i + 1][4] - ir[i][3],
-                ir[i + 1][5] - ir[i][3] }
+            optimized_ir[#optimized_ir + 1] = { "add-to2", ir[i + 1][2], ir[i + 1][3], ir[i + 1][4], ir[i + 1][5] - ir[i][3], ir[i + 1][6] - ir[i][3] }
             optimized_ir[#optimized_ir + 1] = { "<", ir[i][2], ir[i][3] }
             i = i + 2
-        -- elseif -- addition → "add-to"
-        --     ir[i][1] == "[" and
-        --     ir[i + 1][1] == "+" and
-        --     ir[i + 2][1] == "-" and
-        --     ir[i + 3][1] == "]" and
-        --     ir[i + 1][3] == 1 and -- increment by one
-        --     ir[i + 2][3] == 1 and -- decrement by one
-        --     ir[i + 2][4] == 0     -- current cell is decremented
-        -- then
-        --     optimized_ir[#optimized_ir + 1] = { "add-to", ir[i][2], "+", ir[i + 1][4], 0 }
-        --     optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], 0, 0 }
-        --     i = i + 4
-        -- elseif -- addition → "add-to"
-        --     ir[i][1] == "[" and
-        --     ir[i + 1][1] == "-" and
-        --     ir[i + 2][1] == "+" and
-        --     ir[i + 3][1] == "]" and
-        --     ir[i + 1][3] == 1 and -- increment by one
-        --     ir[i + 2][3] == 1 and -- decrement by one
-        --     ir[i + 1][4] == 0     -- current cell is decremented
-        -- then
-        --     optimized_ir[#optimized_ir + 1] = { "add-to", ir[i][2], "+", ir[i + 2][4], 0 }
-        --     optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], 0, 0 }
-        --     i = i + 4
-        -- elseif -- addition to two cells → "add-to"
-        --     ir[i][1] == "[" and
-        --     ir[i + 1][1] == "+" and
-        --     ir[i + 2][1] == "+" and
-        --     ir[i + 3][1] == "-" and
-        --     ir[i + 4][1] == "]" and
-        --     ir[i + 1][3] == 1 and -- increment by one
-        --     ir[i + 2][3] == 1 and -- increment by one
-        --     ir[i + 3][3] == 1 and -- decrement by one
-        --     ir[i + 3][4] == 0     -- current cell is decremented
-        -- then
-        --     optimized_ir[#optimized_ir + 1] = { "add-to", ir[i][2], "+", ir[i + 1][4], 0 }
-        --     optimized_ir[#optimized_ir + 1] = { "add-to", ir[i][2], "+", ir[i + 2][4], 0 }
-        --     optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], 0, 0 }
-        --     i = i + 5
-        -- elseif -- subtraction → "add-to"
-        --     ir[i][1] == "[" and
-        --     ir[i + 1][1] == "-" and
-        --     ir[i + 2][1] == "-" and
-        --     ir[i + 3][1] == "]" and
-        --     ir[i + 1][3] == 1 and -- decrement by one
-        --     ir[i + 2][3] == 1 and -- decrement by one
-        --     ir[i + 2][4] == 0     -- current cell is decremented
-        -- then
-        --     optimized_ir[#optimized_ir + 1] = { "add-to", ir[i][2], "-", ir[i + 1][4], 0 }
-        --     optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], 0, 0 }
-        --     i = i + 4
+        elseif -- combine + with add-to2
+            ir[i][1] == "+" and
+            ir[i + 1][1] == "add-to2" and
+            ir[i][4] == ir[i + 1][5]
+        then
+            optimized_ir[#optimized_ir + 1] = { "add-to2", ir[i + 1][2], ir[i + 1][3] + ir[i][3], ir[i + 1][4], ir[i + 1][5], ir[i + 1][6] }
+            i = i + 2
+        elseif -- combine - with add-to2
+            ir[i][1] == "1" and
+            ir[i + 1][1] == "add-to2" and
+            ir[i][4] == ir[i + 1][5]
+        then
+            optimized_ir[#optimized_ir + 1] = { "add-to2", ir[i + 1][2], ir[i + 1][3] - ir[i][3], ir[i + 1][4], ir[i + 1][5], ir[i + 1][6] }
+            i = i + 2
         -- elseif -- = and add-to → move-to -- TODO this causes problems, does not care about +/- from add-to
         --     ir[i][1] == "=" and
         --     ir[i + 1][1] == "add-to" and
@@ -629,9 +590,21 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
                 ir[i][3] .. " data[ptr" .. ptr_offset(ir[i][5]) .. "])" .. mod_max .. "\n"
             )
         elseif command == "add-to2" then
+            local add = ir[i][3] == 0 and "" or ("+ " .. ir[i][3].. " ")
+            local multiply = ""
+            if ir[i][4] == 1 then
+                multiply = "+ "
+            elseif ir[i][4] == -1 then
+                multiply = "- "
+            elseif ir[i][4] > 0 then
+                multiply = "+ " .. ir[i][4] .. " * "
+            elseif ir[i][4] < 0 then
+                multiply = "- " .. -ir[i][4] .. " * "
+            else
+                multiply = "+ "
+            end
             output_write(
-                "data[ptr" .. ptr_offset(ir[i][5]) .. "] = (data[ptr" .. ptr_offset(ir[i][5]) .. "] + " .. ir[i][3] .. " + " ..
-                ir[i][4] .. " * data[ptr" .. ptr_offset(ir[i][6]) .. "])" .. mod_max .. "\n"
+                "data[ptr" .. ptr_offset(ir[i][5]) .. "] = (data[ptr" .. ptr_offset(ir[i][5]) .. "] " .. add .. multiply .. "data[ptr" .. ptr_offset(ir[i][6]) .. "])" .. mod_max .. "\n"
             )
         elseif command == "move-to" then
             output_write(
