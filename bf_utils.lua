@@ -105,6 +105,7 @@ end
 --- * {">", indentation depth, value} (move ptr by value)
 --- * {"add-to", indentation depth, "+" or "-", ptr offset, ptr offset 2}
 --- * {"move-to", indentation depth, value, ptr offset, ptr offset 2}
+--- * {"add-to2", indentation depth, value +, value *, ptr offset to, ptr offset from}
 --- * {"#", indentation depth} call bf_debug
 --- @tparam string program brainfuck program
 --- @treturn table intermediate representation
@@ -267,57 +268,57 @@ bf_utils.optimize_ir = function(ir, optimization)
                 ir[i + 1][5] - ir[i][3] }
             optimized_ir[#optimized_ir + 1] = { "<", ir[i][2], ir[i][3] }
             i = i + 2
-        elseif -- addition → "add-to"
-            ir[i][1] == "[" and
-            ir[i + 1][1] == "+" and
-            ir[i + 2][1] == "-" and
-            ir[i + 3][1] == "]" and
-            ir[i + 1][3] == 1 and -- increment by one
-            ir[i + 2][3] == 1 and -- decrement by one
-            ir[i + 2][4] == 0     -- current cell is decremented
-        then
-            optimized_ir[#optimized_ir + 1] = { "add-to", ir[i][2], "+", ir[i + 1][4], 0 }
-            optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], 0, 0 }
-            i = i + 4
-        elseif -- addition → "add-to"
-            ir[i][1] == "[" and
-            ir[i + 1][1] == "-" and
-            ir[i + 2][1] == "+" and
-            ir[i + 3][1] == "]" and
-            ir[i + 1][3] == 1 and -- increment by one
-            ir[i + 2][3] == 1 and -- decrement by one
-            ir[i + 1][4] == 0     -- current cell is decremented
-        then
-            optimized_ir[#optimized_ir + 1] = { "add-to", ir[i][2], "+", ir[i + 2][4], 0 }
-            optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], 0, 0 }
-            i = i + 4
-        elseif -- addition to two cells → "add-to"
-            ir[i][1] == "[" and
-            ir[i + 1][1] == "+" and
-            ir[i + 2][1] == "+" and
-            ir[i + 3][1] == "-" and
-            ir[i + 4][1] == "]" and
-            ir[i + 1][3] == 1 and -- increment by one
-            ir[i + 2][3] == 1 and -- increment by one
-            ir[i + 3][3] == 1 and -- decrement by one
-            ir[i + 3][4] == 0     -- current cell is decremented
-        then
-            optimized_ir[#optimized_ir + 1] = { "add-to", ir[i][2], "+", ir[i + 1][4], 0 }
-            optimized_ir[#optimized_ir + 1] = { "add-to", ir[i][2], "+", ir[i + 2][4], 0 }
-            optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], 0, 0 }
-            i = i + 5
-        elseif -- subtraction → "add-to"
-            ir[i][1] == "[" and
-            ir[i + 1][1] == "-" and
-            ir[i + 2][1] == "-" and
-            ir[i + 3][1] == "]" and
-            ir[i + 1][3] == 1 and -- decrement by one
-            ir[i + 2][3] == 1 and -- decrement by one
-            ir[i + 2][4] == 0     -- current cell is decremented
-        then
-            optimized_ir[#optimized_ir + 1] = { "add-to", ir[i][2], "-", ir[i + 1][4], 0 }
-            optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], 0, 0 }
-            i = i + 4
+        -- elseif -- addition → "add-to"
+        --     ir[i][1] == "[" and
+        --     ir[i + 1][1] == "+" and
+        --     ir[i + 2][1] == "-" and
+        --     ir[i + 3][1] == "]" and
+        --     ir[i + 1][3] == 1 and -- increment by one
+        --     ir[i + 2][3] == 1 and -- decrement by one
+        --     ir[i + 2][4] == 0     -- current cell is decremented
+        -- then
+        --     optimized_ir[#optimized_ir + 1] = { "add-to", ir[i][2], "+", ir[i + 1][4], 0 }
+        --     optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], 0, 0 }
+        --     i = i + 4
+        -- elseif -- addition → "add-to"
+        --     ir[i][1] == "[" and
+        --     ir[i + 1][1] == "-" and
+        --     ir[i + 2][1] == "+" and
+        --     ir[i + 3][1] == "]" and
+        --     ir[i + 1][3] == 1 and -- increment by one
+        --     ir[i + 2][3] == 1 and -- decrement by one
+        --     ir[i + 1][4] == 0     -- current cell is decremented
+        -- then
+        --     optimized_ir[#optimized_ir + 1] = { "add-to", ir[i][2], "+", ir[i + 2][4], 0 }
+        --     optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], 0, 0 }
+        --     i = i + 4
+        -- elseif -- addition to two cells → "add-to"
+        --     ir[i][1] == "[" and
+        --     ir[i + 1][1] == "+" and
+        --     ir[i + 2][1] == "+" and
+        --     ir[i + 3][1] == "-" and
+        --     ir[i + 4][1] == "]" and
+        --     ir[i + 1][3] == 1 and -- increment by one
+        --     ir[i + 2][3] == 1 and -- increment by one
+        --     ir[i + 3][3] == 1 and -- decrement by one
+        --     ir[i + 3][4] == 0     -- current cell is decremented
+        -- then
+        --     optimized_ir[#optimized_ir + 1] = { "add-to", ir[i][2], "+", ir[i + 1][4], 0 }
+        --     optimized_ir[#optimized_ir + 1] = { "add-to", ir[i][2], "+", ir[i + 2][4], 0 }
+        --     optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], 0, 0 }
+        --     i = i + 5
+        -- elseif -- subtraction → "add-to"
+        --     ir[i][1] == "[" and
+        --     ir[i + 1][1] == "-" and
+        --     ir[i + 2][1] == "-" and
+        --     ir[i + 3][1] == "]" and
+        --     ir[i + 1][3] == 1 and -- decrement by one
+        --     ir[i + 2][3] == 1 and -- decrement by one
+        --     ir[i + 2][4] == 0     -- current cell is decremented
+        -- then
+        --     optimized_ir[#optimized_ir + 1] = { "add-to", ir[i][2], "-", ir[i + 1][4], 0 }
+        --     optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], 0, 0 }
+        --     i = i + 4
         -- elseif -- = and add-to → move-to -- TODO this causes problems, does not care about +/- from add-to
         --     ir[i][1] == "=" and
         --     ir[i + 1][1] == "add-to" and
@@ -464,31 +465,63 @@ bf_utils.optimize_ir = function(ir, optimization)
             optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3], ir[i + 1][4] }
             optimized_ir[#optimized_ir + 1] = { ir[i][1], ir[i][2], ir[i][3], ir[i][4] }
             i = i + 2
-        elseif -- while → if
+        -- elseif -- while → if
+        --     ir[i][1] == "["
+        -- then
+        --     local correct_instructions = true
+        --     local current_cell_zero = false
+        --     for j = i+1, #ir do
+        --         if ir[j][1] == "]" then
+        --             break
+        --         elseif not is_in(ir[j][1], { "+", "-", "=", "." }) then
+        --             correct_instructions = false
+        --             break
+        --         elseif is_in(ir[j][1], { "+", "-", "=", "." }) and ir[j][3] ~= 0 and ir[j][4] == 0 then
+        --             correct_instructions = false
+        --             break
+        --         elseif ir[j][1] == "=" and ir[j][3] == 0 and ir[j][4] == 0 then
+        --             current_cell_zero = true
+        --         end
+        --     end
+
+        --     if correct_instructions and current_cell_zero then
+        --         optimized_ir[#optimized_ir + 1] = { "if", ir[i][2] }
+        --     else
+        --         optimized_ir[#optimized_ir + 1] = ir[i]
+        --     end
+        --     i = i + 1
+        elseif -- add-to2
             ir[i][1] == "["
         then
             local correct_instructions = true
-            local current_cell_zero = false
+            local cell_deltas = {}
             for j = i+1, #ir do
                 if ir[j][1] == "]" then
                     break
-                elseif not is_in(ir[j][1], { "+", "-", "=", "." }) then
+                elseif not is_in(ir[j][1], { "+", "-" }) then
                     correct_instructions = false
                     break
-                elseif is_in(ir[j][1], { "+", "-", "=", "." }) and ir[j][3] ~= 0 and ir[j][4] == 0 then
-                    correct_instructions = false
-                    break
-                elseif ir[j][1] == "=" and ir[j][3] == 0 and ir[j][4] == 0 then
-                    current_cell_zero = true
+                elseif ir[j][1] == "+" then
+                    cell_deltas[ir[j][4]] = (cell_deltas[ir[j][4]] or 0) + ir[j][3]
+                elseif ir[j][1] == "-" then
+                    cell_deltas[ir[j][4]] = (cell_deltas[ir[j][4]] or 0) - ir[j][3]
                 end
             end
 
-            if correct_instructions and current_cell_zero then
-                optimized_ir[#optimized_ir + 1] = { "if", ir[i][2] }
+            if correct_instructions and cell_deltas[0] == -1 then
+                local depth = ir[i][2]
+                i = i + 2
+                for ptr_offset, multiplied_by in pairs(cell_deltas) do
+                    if ptr_offset ~= 0 then
+                        optimized_ir[#optimized_ir + 1] = { "add-to2", depth, 0, multiplied_by, ptr_offset, 0 }
+                    end
+                    i = i + 1
+                end
+                optimized_ir[#optimized_ir + 1] = { "=", depth, 0, 0 }
             else
                 optimized_ir[#optimized_ir + 1] = ir[i]
+                i = i + 1
             end
-            i = i + 1
         else -- no optimisation applicable
             optimized_ir[#optimized_ir + 1] = ir[i]
             i = i + 1
@@ -594,6 +627,11 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
             output_write(
                 "data[ptr" .. ptr_offset(ir[i][4]) .. "] = (data[ptr" .. ptr_offset(ir[i][4]) .. "] " ..
                 ir[i][3] .. " data[ptr" .. ptr_offset(ir[i][5]) .. "])" .. mod_max .. "\n"
+            )
+        elseif command == "add-to2" then
+            output_write(
+                "data[ptr" .. ptr_offset(ir[i][5]) .. "] = (data[ptr" .. ptr_offset(ir[i][5]) .. "] + " .. ir[i][3] .. " + " ..
+                ir[i][4] .. " * data[ptr" .. ptr_offset(ir[i][6]) .. "])" .. mod_max .. "\n"
             )
         elseif command == "move-to" then
             output_write(
