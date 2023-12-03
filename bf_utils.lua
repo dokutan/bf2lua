@@ -240,14 +240,17 @@ bf_utils.optimize_ir = function(ir, optimization)
 
             if correct_instructions and cell_deltas[0] == -1 then
                 local depth = ir[i][2]
-                i = i + 2
                 for ptr_offset, multiplied_by in pairs(cell_deltas) do
-                    if ptr_offset ~= 0 then
+                    if ptr_offset ~= 0 and multiplied_by ~= 0 then
                         optimized_ir[#optimized_ir + 1] = { "add-to2", depth, 0, multiplied_by, ptr_offset, 0 }
                     end
-                    i = i + 1
                 end
                 optimized_ir[#optimized_ir + 1] = { "=", depth, 0, 0 }
+
+                while ir[i][1] ~= "]" do
+                    i = i + 1
+                end
+                i = i + 1
             end
         end
 
@@ -639,7 +642,7 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
             output_write("ptr = ptr + " .. ir[i][3] .. "\n")
         elseif command == "=" then
             if maximum > 0 then
-                output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = " .. (ir[i][3] % maximum) .. "\n") -- TODO! add option to disable this
+                output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = " .. (ir[i][3] % (maximum + 1)) .. "\n") -- TODO! add option to disable this
             else
                 output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = " .. ir[i][3] .. mod_max .. "\n")
             end
