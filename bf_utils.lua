@@ -125,7 +125,7 @@ bf_utils.convert_brainfuck = function(program)
         elseif string.sub(program, i, i) == "," then
             ir[#ir + 1] = { ",", loops, nil, 0 }
         elseif string.sub(program, i, i) == "." then
-            ir[#ir + 1] = { ".", loops, nil, 0 }
+            ir[#ir + 1] = { ".", loops, 0, 0 }
         elseif string.sub(program, i, i) == "+" then
             if string.sub(program, i + 1, i + 1) == "+" then
                 counter = counter + 1
@@ -356,12 +356,59 @@ bf_utils.optimize_ir = function(ir, optimization)
         then
             optimized_ir[#optimized_ir + 1] = { "add-to2", ir[i + 1][2], ir[i + 1][3] - ir[i][3], ir[i + 1][4], ir[i + 1][5], ir[i + 1][6] }
             i = i + 2
+        elseif -- combine + with add-to2
+            ir[i][1] == "add-to2" and
+            ir[i + 1][1] == "+" and
+            ir[i + 1][4] == ir[i][5]
+        then
+            optimized_ir[#optimized_ir + 1] = { "add-to2", ir[i][2], ir[i][3] + ir[i + 1][3], ir[i][4], ir[i][5], ir[i][6] }
+            i = i + 2
+        elseif -- combine - with add-to2
+            ir[i][1] == "add-to2" and
+            ir[i + 1][1] == "-" and
+            ir[i + 1][4] == ir[i][5]
+        then
+            optimized_ir[#optimized_ir + 1] = { "add-to2", ir[i][2], ir[i][3] - ir[i + 1][3], ir[i][4], ir[i][5], ir[i][6] }
+            i = i + 2
         elseif -- = and add-to2 → move-to2
             ir[i][1] == "=" and
             ir[i + 1][1] == "add-to2" and
             ir[i][4] == ir[i + 1][5] -- both commands act on the same cell
         then
             optimized_ir[#optimized_ir + 1] = { "move-to2", ir[i + 1][2], ir[i][3], ir[i + 1][4], ir[i + 1][5], ir[i + 1][6] }
+            i = i + 2
+        elseif -- = and add-to2 → = and ±
+            ir[i][1] == "=" and
+            ir[i + 1][1] == "add-to2" and
+            ir[i][4] == ir[i + 1][6] and -- from
+            ir[i][4] ~= ir[i + 1][5] -- to
+        then
+            local value = ir[i + 1][3] + ir[i][3] * ir[i + 1][4]
+            if value > 0 then
+                optimized_ir[#optimized_ir + 1] = { "+", ir[i][2], value, ir[i + 1][5] }
+            elseif value < 0 then
+                optimized_ir[#optimized_ir + 1] = { "-", ir[i][2], -value, ir[i + 1][5] }
+            end
+            optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], ir[i][3], ir[i][4] }
+            i = i + 2
+        elseif -- = and move-to2 → = and =
+            ir[i][1] == "=" and
+            ir[i + 1][1] == "move-to2" and
+            ir[i][4] == ir[i + 1][6] and -- from
+            ir[i][4] ~= ir[i + 1][5] and -- to
+            ir[i + 1][3] == 0 and -- todo ?
+            ir[i + 1][4] == 1
+        then
+            optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], ir[i][3], ir[i][4] }
+            optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], ir[i][3], ir[i + 1][5] }
+            i = i + 2
+        elseif -- = and move-to2 → move-to2
+            ir[i][1] == "=" and
+            ir[i + 1][1] == "move-to2" and
+            ir[i][4] ~= ir[i + 1][6] and -- from
+            ir[i][4] == ir[i + 1][5] -- to
+        then
+            optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3], ir[i + 1][4], ir[i + 1][5], ir[i + 1][6] }
             i = i + 2
         elseif -- + is useless after =
             ir[i][1] == "=" and
@@ -392,17 +439,17 @@ bf_utils.optimize_ir = function(ir, optimization)
             optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3], ir[i + 1][4] }
             optimized_ir[#optimized_ir + 1] = { ir[i][1], ir[i][2], ir[i][3], ir[i][4] }
             i = i + 2
-        elseif -- sort +, -, = and add-to2
+        elseif -- sort +, -, = and add-to2, move-to2
             is_in(ir[i][1], { "+", "-", "=" }) and
-            ir[i + 1][1] == "add-to2" and
+            is_in(ir[i + 1][1], { "add-to2", "move-to2" }) and
             ir[i][4] > ir[i + 1][5] and
             ir[i][4] ~= ir[i + 1][6]
         then
             optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3], ir[i + 1][4], ir[i + 1][5], ir[i + 1][6] }
             optimized_ir[#optimized_ir + 1] = { ir[i][1], ir[i][2], ir[i][3], ir[i][4] }
             i = i + 2
-        elseif -- sort add-to2 and +, -, =
-            ir[i][1] == "add-to2" and
+        elseif -- sort add-to2, move-to2 and +, -, =
+            is_in(ir[i][1], { "add-to2", "move-to2" }) and
             is_in(ir[i + 1][1], { "+", "-", "=" }) and
             ir[i][5] > ir[i + 1][4] and
             ir[i][6] ~= ir[i + 1][4]
@@ -410,9 +457,9 @@ bf_utils.optimize_ir = function(ir, optimization)
             optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3], ir[i + 1][4] }
             optimized_ir[#optimized_ir + 1] = { ir[i][1], ir[i][2], ir[i][3], ir[i][4], ir[i][5], ir[i][6] }
             i = i + 2
-        elseif -- sort add-to2
-            ir[i][1] == "add-to2" and
-            ir[i + 1][1] == "add-to2" and
+        elseif -- sort add-to2, move-to2
+            is_in(ir[i][1], { "add-to2", "move-to2" }) and
+            is_in(ir[i + 1][1], { "add-to2", "move-to2" }) and
             ir[i][5] > ir[i + 1][5] and
             ir[i][6] ~= ir[i + 1][5] and
             ir[i][5] ~= ir[i + 1][6]
@@ -520,6 +567,22 @@ bf_utils.optimize_ir = function(ir, optimization)
             ir[i][4] ~= ir[i + 1][4]
         then
             optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3], ir[i + 1][4] }
+            optimized_ir[#optimized_ir + 1] = { ir[i][1], ir[i][2], ir[i][3], ir[i][4] }
+            i = i + 2
+        elseif -- + and . → . and +
+            ir[i][1] == "+" and
+            ir[i + 1][1] == "." and
+            ir[i][4] == ir[i + 1][4]
+        then
+            optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3] + ir[i][3], ir[i + 1][4] }
+            optimized_ir[#optimized_ir + 1] = { ir[i][1], ir[i][2], ir[i][3], ir[i][4] }
+            i = i + 2
+        elseif -- - and . → . and -
+            ir[i][1] == "-" and
+            ir[i + 1][1] == "." and
+            ir[i][4] == ir[i + 1][4]
+        then
+            optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3] - ir[i][3], ir[i + 1][4] }
             optimized_ir[#optimized_ir + 1] = { ir[i][1], ir[i][2], ir[i][3], ir[i][4] }
             i = i + 2
         elseif -- >[≶] → [≶]>
