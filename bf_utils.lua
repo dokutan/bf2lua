@@ -103,9 +103,8 @@ end
 --- * {"=", indentation depth, value, ptr offset} (assign value to cell at ptr + ptr offset)
 --- * {"<", indentation depth, value} (move ptr by -value)
 --- * {">", indentation depth, value} (move ptr by value)
---- * {"add-to", indentation depth, "+" or "-", ptr offset, ptr offset 2}
---- * {"move-to", indentation depth, value, ptr offset, ptr offset 2}
 --- * {"add-to2", indentation depth, value +, value *, ptr offset to, ptr offset from}
+--- * {"move-to2", indentation depth, value =, value *, ptr offset to, ptr offset from}
 --- * {"#", indentation depth} call bf_debug
 --- @tparam string program brainfuck program
 --- @treturn table intermediate representation
@@ -266,6 +265,20 @@ bf_utils.optimize_ir = function(ir, optimization)
             optimized_ir[#optimized_ir + 1] = { "add-to2", ir[i + 1][2], ir[i + 1][3], ir[i + 1][4], ir[i + 1][5] - ir[i][3], ir[i + 1][6] - ir[i][3] }
             optimized_ir[#optimized_ir + 1] = { "<", ir[i][2], ir[i][3] }
             i = i + 2
+        elseif -- swap > with move-to2
+            ir[i][1] == ">" and
+            ir[i + 1][1] == "move-to2"
+        then
+            optimized_ir[#optimized_ir + 1] = { "move-to2", ir[i + 1][2], ir[i + 1][3], ir[i + 1][4], ir[i + 1][5] + ir[i][3], ir[i + 1][6] + ir[i][3] }
+            optimized_ir[#optimized_ir + 1] = { ">", ir[i][2], ir[i][3] }
+            i = i + 2
+        elseif -- swap < with move-to2
+            ir[i][1] == "<" and
+            ir[i + 1][1] == "move-to2"
+        then
+            optimized_ir[#optimized_ir + 1] = { "move-to2", ir[i + 1][2], ir[i + 1][3], ir[i + 1][4], ir[i + 1][5] - ir[i][3], ir[i + 1][6] - ir[i][3] }
+            optimized_ir[#optimized_ir + 1] = { "<", ir[i][2], ir[i][3] }
+            i = i + 2
         elseif -- combine + with add-to2
             ir[i][1] == "+" and
             ir[i + 1][1] == "add-to2" and
@@ -274,26 +287,18 @@ bf_utils.optimize_ir = function(ir, optimization)
             optimized_ir[#optimized_ir + 1] = { "add-to2", ir[i + 1][2], ir[i + 1][3] + ir[i][3], ir[i + 1][4], ir[i + 1][5], ir[i + 1][6] }
             i = i + 2
         elseif -- combine - with add-to2
-            ir[i][1] == "1" and
+            ir[i][1] == "-" and
             ir[i + 1][1] == "add-to2" and
             ir[i][4] == ir[i + 1][5]
         then
             optimized_ir[#optimized_ir + 1] = { "add-to2", ir[i + 1][2], ir[i + 1][3] - ir[i][3], ir[i + 1][4], ir[i + 1][5], ir[i + 1][6] }
             i = i + 2
-        -- elseif -- = and add-to → move-to -- TODO this causes problems, does not care about +/- from add-to
-        --     ir[i][1] == "=" and
-        --     ir[i + 1][1] == "add-to" and
-        --     ir[i][4] == ir[i + 1][4] -- both commands act on the same cell
-        -- then
-        --     optimized_ir[#optimized_ir + 1] = { "move-to", ir[i][2], ir[i][3], ir[i + 1][4], ir[i + 1][5] }
-        --     i = i + 2
-        elseif -- = and move-to → = and =
+        elseif -- = and add-to2 → move-to2
             ir[i][1] == "=" and
-            ir[i + 1][1] == "move-to" and
+            ir[i + 1][1] == "add-to2" and
             ir[i][4] == ir[i + 1][5] -- both commands act on the same cell
         then
-            optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], ir[i][3] + ir[i + 1][3], ir[i + 1][4] }
-            optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], 0, ir[i][4] }
+            optimized_ir[#optimized_ir + 1] = { "move-to2", ir[i + 1][2], ir[i][3], ir[i + 1][4], ir[i + 1][5], ir[i + 1][6] }
             i = i + 2
         elseif -- + is useless after =
             ir[i][1] == "=" and
@@ -323,6 +328,34 @@ bf_utils.optimize_ir = function(ir, optimization)
         then
             optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3], ir[i + 1][4] }
             optimized_ir[#optimized_ir + 1] = { ir[i][1], ir[i][2], ir[i][3], ir[i][4] }
+            i = i + 2
+        elseif -- sort +, -, = and add-to2
+            is_in(ir[i][1], { "+", "-", "=" }) and
+            ir[i + 1][1] == "add-to2" and
+            ir[i][4] > ir[i + 1][5] and
+            ir[i][4] ~= ir[i + 1][6]
+        then
+            optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3], ir[i + 1][4], ir[i + 1][5], ir[i + 1][6] }
+            optimized_ir[#optimized_ir + 1] = { ir[i][1], ir[i][2], ir[i][3], ir[i][4] }
+            i = i + 2
+        elseif -- sort add-to2 and +, -, =
+            ir[i][1] == "add-to2" and
+            is_in(ir[i + 1][1], { "+", "-", "=" }) and
+            ir[i][5] > ir[i + 1][4] and
+            ir[i][6] ~= ir[i + 1][4]
+        then
+            optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3], ir[i + 1][4] }
+            optimized_ir[#optimized_ir + 1] = { ir[i][1], ir[i][2], ir[i][3], ir[i][4], ir[i][5], ir[i][6] }
+            i = i + 2
+        elseif -- sort add-to2
+            ir[i][1] == "add-to2" and
+            ir[i + 1][1] == "add-to2" and
+            ir[i][5] > ir[i + 1][5] and
+            ir[i][6] ~= ir[i + 1][5] and
+            ir[i][5] ~= ir[i + 1][6]
+        then
+            optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3], ir[i + 1][4], ir[i + 1][5], ir[i + 1][6] }
+            optimized_ir[#optimized_ir + 1] = { ir[i][1], ir[i][2], ir[i][3], ir[i][4], ir[i][5], ir[i][6] }
             i = i + 2
         elseif -- +, -, = are useless before ,
             is_in(ir[i][1], { "+", "-", "=" }) and
@@ -584,13 +617,14 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
             else
                 output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = " .. ir[i][3] .. mod_max .. "\n")
             end
-        elseif command == "add-to" then
-            output_write(
-                "data[ptr" .. ptr_offset(ir[i][4]) .. "] = (data[ptr" .. ptr_offset(ir[i][4]) .. "] " ..
-                ir[i][3] .. " data[ptr" .. ptr_offset(ir[i][5]) .. "])" .. mod_max .. "\n"
-            )
         elseif command == "add-to2" then
-            local add = ir[i][3] == 0 and "" or ("+ " .. ir[i][3].. " ")
+            local add = ""
+            if ir[i][3] > 0 then
+                add = "+ " .. ir[i][3] .. " "
+            elseif ir[i][3] < 0 then
+                add = "- " .. -ir[i][3] .. " "
+            end
+
             local multiply = ""
             if ir[i][4] == 1 then
                 multiply = "+ "
@@ -601,14 +635,34 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
             elseif ir[i][4] < 0 then
                 multiply = "- " .. -ir[i][4] .. " * "
             end
+
             output_write(
                 "data[ptr" .. ptr_offset(ir[i][5]) .. "] = (data[ptr" .. ptr_offset(ir[i][5]) .. "] " .. add .. multiply .. "data[ptr" .. ptr_offset(ir[i][6]) .. "])" .. mod_max .. "\n"
             )
-        elseif command == "move-to" then
-            output_write(
-                "data[ptr" .. ptr_offset(ir[i][4]) .. "] = (" .. ir[i][3] ..
-                " + data[ptr" .. ptr_offset(ir[i][5]) .. "])" .. mod_max .. "\n"
-            )
+        elseif command == "move-to2" then
+            local add = ""
+            if ir[i][3] > 0 then
+                add = " + " .. ir[i][3]
+            elseif ir[i][3] < 0 then
+                add = " - " .. -ir[i][3]
+            end
+
+            local multiply = ""
+            if ir[i][4] == -1 then
+                multiply = "-"
+            elseif ir[i][4] ~= 1 then
+                multiply = ir[i][4] .. " * "
+            end
+
+            if add == "" and multiply == "" then
+                output_write(
+                    "data[ptr" .. ptr_offset(ir[i][5]) .. "] = data[ptr" .. ptr_offset(ir[i][6]) .. "]\n"
+                )
+            else
+                output_write(
+                    "data[ptr" .. ptr_offset(ir[i][5]) .. "] = (" .. multiply .. "data[ptr" .. ptr_offset(ir[i][6]) .. "]" .. add .. ")" .. mod_max .. "\n"
+                )
+            end
         elseif command == "#" and debugging then
             output_write("bf_debug()\n")
         end
