@@ -600,8 +600,6 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
                 multiply = "+ " .. ir[i][4] .. " * "
             elseif ir[i][4] < 0 then
                 multiply = "- " .. -ir[i][4] .. " * "
-            else
-                multiply = "+ "
             end
             output_write(
                 "data[ptr" .. ptr_offset(ir[i][5]) .. "] = (data[ptr" .. ptr_offset(ir[i][5]) .. "] " .. add .. multiply .. "data[ptr" .. ptr_offset(ir[i][6]) .. "])" .. mod_max .. "\n"
