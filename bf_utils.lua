@@ -255,6 +255,86 @@ bf_utils.optimize_ir = function(ir, optimization)
             end
         end
 
+        if -- = and add-to2 → move-to2
+            ir[i][1] == "="
+        then
+            local depth = ir[i][2]
+            local value = ir[i][3]
+            local from = ir[i][4]
+
+            local optimized_instructions = {}
+            local replaced_add_to = false
+            local processed_instructions = 0 -- number of instructions removed from the input - 1
+
+            for j = i+1, #ir do
+                if ir[j][1] == "add-to2" and ir[j][5] == from and ir[j][6] ~= from then
+                    optimized_instructions[#optimized_instructions + 1] = { "move-to2", depth, value + ir[j][3], ir[j][4], ir[j][5], ir[j][6] }
+                    processed_instructions = processed_instructions + 1
+                    replaced_add_to = true
+                    break
+                elseif
+                    (is_in(ir[j][1], { "+", "-", "=", ",", "." }) and ir[j][4] ~= from) or -- ignore unrelated +, -, =
+                    (is_in(ir[j][1], { "add-to2", "move-to2" }) and ir[j][5] ~= from and ir[j][6] ~= from) or -- ignore unrelated add-to2, move-to2
+                    ir[j][1] == "print"
+                then
+                    optimized_instructions[#optimized_instructions + 1] = ir[j]
+                    processed_instructions = processed_instructions + 1
+                else
+                    break
+                end
+            end
+
+            if replaced_add_to then
+                for _, instruction in ipairs(optimized_instructions) do
+                    optimized_ir[#optimized_ir + 1] = instruction
+                end
+                i = i + processed_instructions + 1
+            end
+        end
+
+        if -- = and add-to2 → = and ±
+            ir[i][1] == "="
+        then
+            local depth = ir[i][2]
+            local value = ir[i][3]
+            local from = ir[i][4]
+
+            local optimized_instructions = {}
+            local replaced_add_to = false
+            local processed_instructions = 0 -- number of instructions removed from the input - 1
+
+            for j = i+1, #ir do
+                if ir[j][1] == "add-to2" and ir[j][5] ~= from and ir[j][6] == from then
+                    local value2 = ir[j][3] + ir[j][4] * value
+                    if value2 > 0 then
+                        optimized_instructions[#optimized_instructions + 1] = { "+", depth, value2, ir[j][5] }
+                    elseif value2 < 0 then
+                        optimized_instructions[#optimized_instructions + 1] = { "-", depth, -value2, ir[j][5] }
+                    end
+                    processed_instructions = processed_instructions + 1
+                    replaced_add_to = true
+                    break
+                elseif
+                    (is_in(ir[j][1], { "+", "-", "=", ",", "." }) and ir[j][4] ~= from) or -- ignore unrelated +, -, =
+                    (is_in(ir[j][1], { "add-to2", "move-to2" }) and ir[j][5] ~= from and ir[j][6] ~= from) or -- ignore unrelated add-to2, move-to2
+                    ir[j][1] == "print"
+                then
+                    optimized_instructions[#optimized_instructions + 1] = ir[j]
+                    processed_instructions = processed_instructions + 1
+                else
+                    break
+                end
+            end
+
+            if replaced_add_to then
+                for _, instruction in ipairs(optimized_instructions) do
+                    optimized_ir[#optimized_ir + 1] = instruction
+                end
+                optimized_ir[#optimized_ir + 1] = { "=", depth, ir[i][3], ir[i][4] }
+                i = i + processed_instructions + 1
+            end
+        end
+
         if -- = and move-to2 → = and =
             ir[i][1] == "="
         then
@@ -492,27 +572,6 @@ bf_utils.optimize_ir = function(ir, optimization)
             ir[i + 1][4] == ir[i][5]
         then
             optimized_ir[#optimized_ir + 1] = { "add-to2", ir[i][2], ir[i][3] - ir[i + 1][3], ir[i][4], ir[i][5], ir[i][6] }
-            i = i + 2
-        elseif -- = and add-to2 → move-to2
-            ir[i][1] == "=" and
-            ir[i + 1][1] == "add-to2" and
-            ir[i][4] == ir[i + 1][5] -- both commands act on the same cell
-        then
-            optimized_ir[#optimized_ir + 1] = { "move-to2", ir[i + 1][2], ir[i][3], ir[i + 1][4], ir[i + 1][5], ir[i + 1][6] }
-            i = i + 2
-        elseif -- = and add-to2 → = and ±
-            ir[i][1] == "=" and
-            ir[i + 1][1] == "add-to2" and
-            ir[i][4] == ir[i + 1][6] and -- from
-            ir[i][4] ~= ir[i + 1][5] -- to
-        then
-            local value = ir[i + 1][3] + ir[i][3] * ir[i + 1][4]
-            if value > 0 then
-                optimized_ir[#optimized_ir + 1] = { "+", ir[i][2], value, ir[i + 1][5] }
-            elseif value < 0 then
-                optimized_ir[#optimized_ir + 1] = { "-", ir[i][2], -value, ir[i + 1][5] }
-            end
-            optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], ir[i][3], ir[i][4] }
             i = i + 2
         elseif -- = and move-to2 → move-to2
             ir[i][1] == "=" and
