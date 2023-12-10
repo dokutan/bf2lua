@@ -273,6 +273,9 @@ bf_utils.optimize_ir = function(ir, optimization)
                 elseif is_in(ir[j][1], { "+", "-", "=" }) and ir[j][4] ~= from then -- ignore unrelated +, -, =
                     optimized_instructions[#optimized_instructions + 1] = ir[j]
                     processed_instructions = processed_instructions + 1
+                elseif is_in(ir[j][1], { "add-to2", "move-to2" }) and ir[j][5] ~= from and ir[j][6] ~= from then -- ignore unrelated add-to2, move-to2
+                    optimized_instructions[#optimized_instructions + 1] = ir[j]
+                    processed_instructions = processed_instructions + 1
                 else
                     break
                 end
