@@ -105,6 +105,7 @@ end
 --- * {">", indentation depth, value} (move ptr by value)
 --- * {"add-to2", indentation depth, value +, value *, ptr offset to, ptr offset from}
 --- * {"move-to2", indentation depth, value =, value *, ptr offset to, ptr offset from}
+--- * {"print", indentation depth, bytes} print bytes
 --- * {"#", indentation depth} call bf_debug
 --- @tparam string program brainfuck program
 --- @treturn table intermediate representation
@@ -270,10 +271,11 @@ bf_utils.optimize_ir = function(ir, optimization)
                     optimized_instructions[#optimized_instructions + 1] = { "=", depth, ir[j][3] + ir[j][4] * value, ir[j][5] }
                     processed_instructions = processed_instructions + 1
                     replaced_move_to = true
-                elseif is_in(ir[j][1], { "+", "-", "=", ",", "." }) and ir[j][4] ~= from then -- ignore unrelated +, -, =, ,, .
-                    optimized_instructions[#optimized_instructions + 1] = ir[j]
-                    processed_instructions = processed_instructions + 1
-                elseif is_in(ir[j][1], { "add-to2", "move-to2" }) and ir[j][5] ~= from and ir[j][6] ~= from then -- ignore unrelated add-to2, move-to2
+                elseif
+                    (is_in(ir[j][1], { "+", "-", "=", ",", "." }) and ir[j][4] ~= from) or -- ignore unrelated +, -, =
+                    (is_in(ir[j][1], { "add-to2", "move-to2" }) and ir[j][5] ~= from and ir[j][6] ~= from) or -- ignore unrelated add-to2, move-to2
+                    ir[j][1] == "print"
+                then
                     optimized_instructions[#optimized_instructions + 1] = ir[j]
                     processed_instructions = processed_instructions + 1
                 else
@@ -317,10 +319,48 @@ bf_utils.optimize_ir = function(ir, optimization)
                     processed_instructions = processed_instructions + 1
                     replaced_instruction = true
                     break
-                elseif is_in(ir[j][1], { "+", "-", "=", ",", "." }) and ir[j][4] ~= ptr_offset then -- ignore unrelated +, -, =
+                elseif
+                    (is_in(ir[j][1], { "+", "-", "=", ",", "." }) and ir[j][4] ~= ptr_offset) or -- ignore unrelated +, -, =
+                    (is_in(ir[j][1], { "add-to2", "move-to2" }) and ir[j][5] ~= ptr_offset and ir[j][6] ~= ptr_offset) or -- ignore unrelated add-to2, move-to2
+                    ir[j][1] == "print"
+                then
                     optimized_instructions[#optimized_instructions + 1] = ir[j]
                     processed_instructions = processed_instructions + 1
-                elseif is_in(ir[j][1], { "add-to2", "move-to2" }) and ir[j][5] ~= ptr_offset and ir[j][6] ~= ptr_offset then -- ignore unrelated add-to2, move-to2
+                else
+                    break
+                end
+            end
+
+            if replaced_instruction then
+                optimized_ir[#optimized_ir + 1] = { "=", depth, value, ptr_offset }
+                for _, instruction in ipairs(optimized_instructions) do
+                    optimized_ir[#optimized_ir + 1] = instruction
+                end
+                i = i + processed_instructions + 1
+            end
+        end
+
+        if -- = and . → print
+            ir[i][1] == "="
+        then
+            local depth = ir[i][2]
+            local value = ir[i][3]
+            local ptr_offset = ir[i][4]
+
+            local optimized_instructions = {}
+            local replaced_instruction = false
+            local processed_instructions = 0 -- number of instructions removed from the input - 1
+
+            for j = i+1, #ir do
+                if ir[j][1] == "." and ir[j][4] == ptr_offset then
+                    optimized_instructions[#optimized_instructions + 1] = { "print", depth, {value + ir[j][3]} }
+                    processed_instructions = processed_instructions + 1
+                    replaced_instruction = true
+                elseif
+                    (is_in(ir[j][1], { "+", "-", "=", ",", "." }) and ir[j][4] ~= ptr_offset) or -- ignore unrelated +, -, =
+                    (is_in(ir[j][1], { "add-to2", "move-to2" }) and ir[j][5] ~= ptr_offset and ir[j][6] ~= ptr_offset) or -- ignore unrelated add-to2, move-to2
+                    ir[j][1] == "print"
+                then
                     optimized_instructions[#optimized_instructions + 1] = ir[j]
                     processed_instructions = processed_instructions + 1
                 else
@@ -597,6 +637,16 @@ bf_utils.optimize_ir = function(ir, optimization)
                 optimized_ir[#optimized_ir + 1] = { ">", ir[i][2], ir[i + 1][3] - ir[i][3], ir[i][4] }
             end
             i = i + 2
+        elseif -- combine print and print
+            ir[i][1] == "print" and
+            ir[i + 1][1] == "print"
+        then
+            local bytes = ir[i][3]
+            for _, byte in ipairs(ir[i + 1][3]) do
+                bytes[#bytes + 1] = byte
+            end
+            optimized_ir[#optimized_ir + 1] = { "print", ir[i][2], bytes }
+            i = i + 2
         elseif -- + or - is useless before =
             (ir[i][1] == "+" or ir[i][1] == "-") and
             ir[i + 1][1] == "="
@@ -806,6 +856,24 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
                     "data[ptr" .. ptr_offset(ir[i][5]) .. "] = (" .. multiply .. "data[ptr" .. ptr_offset(ir[i][6]) .. "]" .. add .. ")" .. mod_max .. "\n"
                 )
             end
+        elseif command == "print" then
+            local bytes = ""
+            for _, byte in ipairs(ir[i][3]) do
+                byte = byte % 256
+                if byte == 10 then
+                    byte = "\\n"
+                elseif byte == 34 then
+                    byte = "\\\""
+                elseif byte == 92 then
+                    byte = "\\\\"
+                elseif byte >= 32 and byte <=126 then
+                    byte = string.char(byte)
+                else
+                    byte = "\\" .. byte
+                end
+                bytes = bytes .. byte
+            end
+            output_write("io.write(\"" .. bytes .. "\")\n")
         elseif command == "#" and debugging then
             output_write("bf_debug()\n")
         end
