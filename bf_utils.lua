@@ -270,7 +270,7 @@ bf_utils.optimize_ir = function(ir, optimization)
                     optimized_instructions[#optimized_instructions + 1] = { "=", depth, ir[j][3] + ir[j][4] * value, ir[j][5] }
                     processed_instructions = processed_instructions + 1
                     replaced_move_to = true
-                elseif is_in(ir[j][1], { "+", "-", "=" }) and ir[j][4] ~= from then -- ignore unrelated +, -, =
+                elseif is_in(ir[j][1], { "+", "-", "=", ",", "." }) and ir[j][4] ~= from then -- ignore unrelated +, -, =, ,, .
                     optimized_instructions[#optimized_instructions + 1] = ir[j]
                     processed_instructions = processed_instructions + 1
                 elseif is_in(ir[j][1], { "add-to2", "move-to2" }) and ir[j][5] ~= from and ir[j][6] ~= from then -- ignore unrelated add-to2, move-to2
@@ -283,6 +283,53 @@ bf_utils.optimize_ir = function(ir, optimization)
 
             if replaced_move_to then
                 optimized_ir[#optimized_ir + 1] = { "=", depth, value, from }
+                for _, instruction in ipairs(optimized_instructions) do
+                    optimized_ir[#optimized_ir + 1] = instruction
+                end
+                i = i + processed_instructions + 1
+            end
+        end
+
+        if -- = and +,-,= → =
+            ir[i][1] == "="
+        then
+            local depth = ir[i][2]
+            local value = ir[i][3]
+            local ptr_offset = ir[i][4]
+
+            local optimized_instructions = {}
+            local replaced_instruction = false
+            local processed_instructions = 0 -- number of instructions removed from the input - 1
+
+            for j = i+1, #ir do
+                if ir[j][1] == "+" and ir[j][4] == ptr_offset then -- = and + → =
+                    value = value + ir[j][3]
+                    processed_instructions = processed_instructions + 1
+                    replaced_instruction = true
+                    break
+                elseif ir[j][1] == "-" and ir[j][4] == ptr_offset then -- = and - → =
+                    value = value - ir[j][3]
+                    processed_instructions = processed_instructions + 1
+                    replaced_instruction = true
+                    break
+                elseif ir[j][1] == "=" and ir[j][4] == ptr_offset then -- = and = → =
+                    value = ir[j][3]
+                    processed_instructions = processed_instructions + 1
+                    replaced_instruction = true
+                    break
+                elseif is_in(ir[j][1], { "+", "-", "=", ",", "." }) and ir[j][4] ~= ptr_offset then -- ignore unrelated +, -, =
+                    optimized_instructions[#optimized_instructions + 1] = ir[j]
+                    processed_instructions = processed_instructions + 1
+                elseif is_in(ir[j][1], { "add-to2", "move-to2" }) and ir[j][5] ~= ptr_offset and ir[j][6] ~= ptr_offset then -- ignore unrelated add-to2, move-to2
+                    optimized_instructions[#optimized_instructions + 1] = ir[j]
+                    processed_instructions = processed_instructions + 1
+                else
+                    break
+                end
+            end
+
+            if replaced_instruction then
+                optimized_ir[#optimized_ir + 1] = { "=", depth, value, ptr_offset }
                 for _, instruction in ipairs(optimized_instructions) do
                     optimized_ir[#optimized_ir + 1] = instruction
                 end
@@ -434,27 +481,6 @@ bf_utils.optimize_ir = function(ir, optimization)
             ir[i][4] == ir[i + 1][5] -- to
         then
             optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3], ir[i + 1][4], ir[i + 1][5], ir[i + 1][6] }
-            i = i + 2
-        elseif -- + is useless after =
-            ir[i][1] == "=" and
-            ir[i + 1][1] == "+" and
-            ir[i][4] == ir[i + 1][4] -- both commands act on the same cell
-        then
-            optimized_ir[#optimized_ir + 1] = { "=", ir[i + 1][2], ir[i][3] + ir[i + 1][3], ir[i + 1][4] }
-            i = i + 2
-        elseif -- - is useless after =
-            ir[i][1] == "=" and
-            ir[i + 1][1] == "-" and
-            ir[i][4] == ir[i + 1][4] -- both commands act on the same cell
-        then
-            optimized_ir[#optimized_ir + 1] = { "=", ir[i + 1][2], ir[i][3] - ir[i + 1][3], ir[i + 1][4] }
-            i = i + 2
-        elseif -- = is useless before =
-            ir[i][1] == "=" and
-            ir[i + 1][1] == "=" and
-            ir[i][4] == ir[i + 1][4]
-        then
-            optimized_ir[#optimized_ir + 1] = { "=", ir[i + 1][2], ir[i + 1][3], ir[i + 1][4] }
             i = i + 2
         elseif -- sort +, -, =
             is_in(ir[i][1], { "+", "-", "=" }) and
