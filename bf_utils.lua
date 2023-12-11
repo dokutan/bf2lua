@@ -792,9 +792,7 @@ bf_utils.optimize_ir = function(ir, optimization)
             optimized_ir[#optimized_ir + 1] = { ir[i][1], ir[i][2], ir[i][3], ir[i][4] }
             i = i + 2
         elseif -- make joining writes easier
-            ir[i][1] ~= "." and
-            ir[i][1] ~= "," and
-            ir[i][1] ~= "print" and
+            not is_in(ir[i][1], {".", ",", "print", "[", "]", "if", "#"}) and
             ir[i + 1][1] == "print"
         then
             optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3], ir[i + 1][4] }
