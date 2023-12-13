@@ -392,7 +392,7 @@ bf_utils.optimize_ir = function(ir, optimization)
                     break
                 elseif
                     (is_in(ir[j][1], { "+", "-", "=", ",", "." }) and ir[j][4] ~= from) or -- ignore unrelated +, -, =
-                    (is_in(ir[j][1], { "add-to2", "move-to2" }) and ir[j][5] ~= from) or -- ignore unrelated add-to2, move-to2
+                    (is_in(ir[j][1], { "add-to2", "move-to2" }) and ir[j][5] ~= from and ir[j][5] ~= to) or -- ignore unrelated add-to2, move-to2
                     ir[j][1] == "print"
                 then
                     optimized_instructions[#optimized_instructions + 1] = ir[j]
