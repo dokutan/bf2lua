@@ -881,6 +881,42 @@ bf_utils.optimize_ir = function(ir, optimization)
     return optimized_ir
 end
 
+bf_utils.optimize_ir2 = function(ir, optimization)
+    if optimization < 2 then
+        return ir
+    end
+
+    local optimized_ir = {}
+    local modified_cells = {}
+    local i = 1
+
+    while i <= #ir do
+        if ir[i][1] == "+" and not modified_cells[ir[i][4]] then -- + → = at start of program
+            optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], ir[i][3], ir[i][4] }
+            modified_cells[ir[i][4]] = true
+            i = i + 1
+        elseif ir[i][1] == "-" and not modified_cells[ir[i][4]] then -- - → = at start of program
+            optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], -ir[i][3], ir[i][4] }
+            modified_cells[ir[i][4]] = true
+            i = i + 1
+        elseif ir[i][1] == "=" and not modified_cells[ir[i][4]] and ir[i][3] == 0 then -- remove = 0 at start of program
+            i = i + 1
+        elseif ir[i][1] == "=" then -- = at start of program
+            optimized_ir[#optimized_ir + 1] = ir[i]
+            modified_cells[ir[i][4]] = true
+            i = i + 1
+        else
+            break
+        end
+    end
+
+    while i <= #ir do
+        optimized_ir[#optimized_ir + 1] = ir[i]
+        i = i + 1
+    end
+
+    return optimized_ir
+end
 
 --- Converts the intermediate representation to Lua code.
 ---
