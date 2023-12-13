@@ -221,6 +221,37 @@ bf_utils.optimize_ir = function(ir, optimization)
             end
         end
 
+        if -- while → if
+            ir[i][1] == "[" and ir[i][4] == 0
+        then
+            local correct_instructions = true
+            local current_cell_increment = 0
+            for j = i+1, #ir do
+                if ir[j][1] == "]" then
+                    break
+                elseif ir[j][1] == "+" and ir[j][4] == 0 then
+                    current_cell_increment = current_cell_increment + ir[j][3]
+                elseif ir[j][1] == "-" and ir[j][4] == 0 then
+                    current_cell_increment = current_cell_increment - ir[j][3]
+                elseif ir[j][1] ~= "=" or (ir[j][1] == "=" and ir[j][4] == 0) then
+                    correct_instructions = false
+                    break
+                end
+            end
+
+            if correct_instructions and current_cell_increment == -1 then
+                optimized_ir[#optimized_ir + 1] = { "if", ir[i][2] }
+                optimized_ir[#optimized_ir + 1] = { "=", ir[i][2] + 1, 0, 0 }
+                i = i + 1
+                while ir[i][1] ~= "]" do
+                    if ir[i][1] == "=" then
+                        optimized_ir[#optimized_ir + 1] = ir[i]
+                    end
+                    i = i + 1
+                end
+            end
+        end
+
         if -- loop → add-to2
             ir[i][1] == "[" and ir[i][4] == 0
         then
