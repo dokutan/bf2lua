@@ -151,6 +151,10 @@ local main = function()
         ir = bf_utils.optimize_ir(ir, optimization)
         ir = bf_utils.optimize_ir(ir, optimization)
         ir = bf_utils.optimize_ir(ir, optimization)
+        ir = bf_utils.optimize_ir(ir, optimization)
+        ir = bf_utils.optimize_ir(ir, optimization)
+        ir = bf_utils.optimize_ir(ir, optimization)
+        ir = bf_utils.optimize_ir(ir, optimization)
     end
 
     -- open output

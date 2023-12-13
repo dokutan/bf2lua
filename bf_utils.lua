@@ -200,7 +200,7 @@ bf_utils.optimize_ir = function(ir, optimization)
             for j = i+1, #ir do
                 if ir[j][1] == "]" then
                     break
-                elseif not is_in(ir[j][1], { "+", "-", "=", ".", "add-to2", "move-to2" }) then
+                elseif not is_in(ir[j][1], { "+", "-", "=", ".", "print", "add-to2", "move-to2" }) then
                     correct_instructions = false
                     break
                 elseif is_in(ir[j][1], { "+", "-", "=" }) and ir[j][3] ~= 0 and ir[j][4] == 0 then
@@ -889,22 +889,45 @@ bf_utils.optimize_ir2 = function(ir, optimization)
     local optimized_ir = {}
     local modified_cells = {}
     local i = 1
+    local ptr = 1
 
     while i <= #ir do
-        if ir[i][1] == "+" and not modified_cells[ir[i][4]] then -- + → = at start of program
+        if ir[i][1] == "+" and not modified_cells[ptr + ir[i][4]] then -- + → = at start of program
             optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], ir[i][3], ir[i][4] }
-            modified_cells[ir[i][4]] = true
+            modified_cells[ptr + ir[i][4]] = true
             i = i + 1
-        elseif ir[i][1] == "-" and not modified_cells[ir[i][4]] then -- - → = at start of program
+        elseif ir[i][1] == "-" and not modified_cells[ptr + ir[i][4]] then -- - → = at start of program
             optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], -ir[i][3], ir[i][4] }
-            modified_cells[ir[i][4]] = true
+            modified_cells[ptr + ir[i][4]] = true
             i = i + 1
-        elseif ir[i][1] == "=" and not modified_cells[ir[i][4]] and ir[i][3] == 0 then -- remove = 0 at start of program
+        elseif ir[i][1] == "=" and not modified_cells[ptr + ir[i][4]] and ir[i][3] == 0 then -- remove = 0 at start of program
             i = i + 1
         elseif ir[i][1] == "=" then -- = at start of program
             optimized_ir[#optimized_ir + 1] = ir[i]
-            modified_cells[ir[i][4]] = true
+            modified_cells[ptr + ir[i][4]] = true
             i = i + 1
+        elseif ir[i][1] == "print" then -- print at start of program
+            optimized_ir[#optimized_ir + 1] = ir[i]
+            i = i + 1
+        elseif ir[i][1] == ">" then
+            optimized_ir[#optimized_ir + 1] = ir[i]
+            ptr = ptr + ir[i][3]
+            i = i + 1
+        elseif ir[i][1] == "<" then
+            optimized_ir[#optimized_ir + 1] = ir[i]
+            ptr = ptr - ir[i][3]
+            i = i + 1
+        elseif ir[i][1] == "[" and not modified_cells[ptr + ir[i][4]] then -- remove loop at start of program
+            i = i + 1
+            local loop_depth = 1
+            while loop_depth > 0 do
+                if ir[i][1] == "[" or ir[i][1] == "if" then
+                    loop_depth = loop_depth + 1
+                elseif ir[i][1] == "]" then
+                    loop_depth = loop_depth - 1
+                end
+                i = i + 1
+            end
         else
             break
         end
