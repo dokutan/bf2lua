@@ -900,6 +900,15 @@ bf_utils.optimize_ir2 = function(ir, optimization)
             optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], -ir[i][3], ir[i][4] }
             modified_cells[ptr + ir[i][4]] = true
             i = i + 1
+        elseif ir[i][1] == "add-to2" and not modified_cells[ptr + ir[i][6]] then -- add-to2 → ± at start of program
+            if ir[i][3] > 0 then
+                optimized_ir[#optimized_ir + 1] = { "+", ir[i][2], ir[i][3], ir[i][5] }
+                modified_cells[ptr + ir[i][5]] = true
+            elseif ir[i][3] < 0 then
+                optimized_ir[#optimized_ir + 1] = { "-", ir[i][2], -ir[i][3], ir[i][5] }
+                modified_cells[ptr + ir[i][5]] = true
+            end
+            i = i + 1
         elseif ir[i][1] == "=" and not modified_cells[ptr + ir[i][4]] and ir[i][3] == 0 then -- remove = 0 at start of program
             i = i + 1
         elseif ir[i][1] == "=" then -- = at start of program
@@ -918,6 +927,17 @@ bf_utils.optimize_ir2 = function(ir, optimization)
             ptr = ptr - ir[i][3]
             i = i + 1
         elseif ir[i][1] == "[" and not modified_cells[ptr + ir[i][4]] then -- remove loop at start of program
+            i = i + 1
+            local loop_depth = 1
+            while loop_depth > 0 do
+                if ir[i][1] == "[" or ir[i][1] == "if" then
+                    loop_depth = loop_depth + 1
+                elseif ir[i][1] == "]" then
+                    loop_depth = loop_depth - 1
+                end
+                i = i + 1
+            end
+        elseif ir[i][1] == "if" and not modified_cells[ptr] then -- remove if at start of program
             i = i + 1
             local loop_depth = 1
             while loop_depth > 0 do
