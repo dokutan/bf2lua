@@ -95,7 +95,7 @@ end
 ---
 --- * {"[", indentation depth, nil, ptr offset}
 --- * {"]", indentation depth}
---- * {"if", indentation depth}
+--- * {"if", indentation depth, nil, ptr offset}
 --- * {",", indentation depth, nil, ptr offset}
 --- * {".", indentation depth, value offset, ptr offset} (add value offset + value of cell at ptr + ptr offset)
 --- * {"+", indentation depth, value, ptr offset} (add value to cell at ptr + ptr offset)
@@ -216,7 +216,7 @@ bf_utils.optimize_ir = function(ir, optimization)
 
 
             if correct_instructions and current_cell_zero then
-                optimized_ir[#optimized_ir + 1] = { "if", ir[i][2] }
+                optimized_ir[#optimized_ir + 1] = { "if", ir[i][2], nil, 0 }
                 i = i + 1
             end
         end
@@ -240,7 +240,7 @@ bf_utils.optimize_ir = function(ir, optimization)
             end
 
             if correct_instructions and current_cell_increment == -1 then
-                optimized_ir[#optimized_ir + 1] = { "if", ir[i][2] }
+                optimized_ir[#optimized_ir + 1] = { "if", ir[i][2], nil, 0 }
                 optimized_ir[#optimized_ir + 1] = { "=", ir[i][2] + 1, 0, 0 }
                 i = i + 1
                 while ir[i][1] ~= "]" do
@@ -524,6 +524,67 @@ bf_utils.optimize_ir = function(ir, optimization)
                     optimized_ir[#optimized_ir + 1] = instruction
                 end
                 i = i + processed_instructions + 1
+            end
+        end
+
+        if -- ≶ and if → if and ≶
+            (ir[i][1] == "<" or ir[i][1] == ">") and
+            ir[i+1][1] == "if"
+        then
+            local depth = ir[i][2]
+            local if_ptr_offset = ir[i + 1][4]
+            local ptr_offset = 0
+            if ir[i][1] == "<" then
+                ptr_offset = -ir[i][3]
+            else
+                ptr_offset = ir[i][3]
+            end
+
+            local optimized_instructions = {}
+            local invalid_instructions = false
+            local processed_instructions = 0 -- number of instructions removed from the input - 1
+
+            for j = i+2, #ir do
+                if
+                    is_in(ir[j][1], { "+", "-", "=", ",", "." })
+                then
+                    optimized_instructions[#optimized_instructions + 1] = { ir[j][1], ir[j][2], ir[j][3], ir[j][4] + ptr_offset }
+                    processed_instructions = processed_instructions + 1
+                elseif
+                    is_in(ir[j][1], { "add-to2", "move-to2" })
+                then
+                    optimized_instructions[#optimized_instructions + 1] = { ir[j][1], ir[j][2], ir[j][3], ir[j][4], ir[j][5] + ptr_offset, ir[j][6] + ptr_offset }
+                    processed_instructions = processed_instructions + 1
+                elseif
+                    ir[j][1] == "print"
+                then
+                    optimized_instructions[#optimized_instructions + 1] = ir[j]
+                    processed_instructions = processed_instructions + 1
+                elseif
+                    ir[j][1] == "]"
+                then
+                    optimized_instructions[#optimized_instructions + 1] = ir[j]
+                    processed_instructions = processed_instructions + 1
+                    break
+                else
+                    invalid_instructions = true
+                    break
+                end
+            end
+
+            if not invalid_instructions then
+                optimized_ir[#optimized_ir + 1] = { "if", depth, nil, if_ptr_offset + ptr_offset }
+                for _, instruction in ipairs(optimized_instructions) do
+                    optimized_ir[#optimized_ir + 1] = instruction
+                end
+
+                if ptr_offset > 0 then
+                    optimized_ir[#optimized_ir + 1] = { ">", depth, ptr_offset }
+                else
+                    optimized_ir[#optimized_ir + 1] = { "<", depth, -ptr_offset }
+                end
+
+                i = i + processed_instructions + 2
             end
         end
 
@@ -937,7 +998,7 @@ bf_utils.optimize_ir2 = function(ir, optimization)
                 end
                 i = i + 1
             end
-        elseif ir[i][1] == "if" and not modified_cells[ptr] then -- remove if at start of program
+        elseif ir[i][1] == "if" and not modified_cells[ptr + ir[i][4]] then -- remove if at start of program
             i = i + 1
             local loop_depth = 1
             while loop_depth > 0 do
@@ -1009,7 +1070,7 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
                 function_counter = function_counter + 1
             end
         elseif command == "if" then
-            output_write("if data[ptr] ~= 0 then\n")
+            output_write("if data[ptr" .. ptr_offset(ir[i][4]) .. "] ~= 0 then\n")
             if functions then
                 output_write("function loop" .. function_counter .. "()\n")
                 function_names[loops] = function_counter
