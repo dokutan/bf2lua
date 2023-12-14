@@ -590,6 +590,44 @@ bf_utils.optimize_ir = function(ir, optimization)
             end
         end
 
+        if -- ] and ± → ] and =
+            ir[i][1] == "]" and
+            (ir[i + 1][1] == "+" or ir[i + 1][1] == "-")
+        then
+            local loop_ptr_offset = nil
+            local loop_depth = 1
+            local depth = ir[i][2]
+            local set_ptr_offset = ir[i + 1][4]
+            local value = 0
+            if ir[i + 1][1] == "+" then
+                value = ir[i + 1][3]
+            else
+                value = -ir[i + 1][3]
+            end
+
+            for j = i-1, 1, -1 do
+                if
+                    ir[j][1] == "]"
+                then
+                    loop_depth = loop_depth + 1
+                elseif
+                    ir[j][1] == "[" or ir[j][1] == "if"
+                then
+                    loop_depth = loop_depth - 1
+                    if loop_depth <= 0 then
+                        loop_ptr_offset = ir[j][4]
+                        break
+                    end
+                end
+            end
+
+            if loop_ptr_offset == set_ptr_offset then
+                optimized_ir[#optimized_ir + 1] = { "]", depth }
+                optimized_ir[#optimized_ir + 1] = { "=", depth, value, set_ptr_offset }
+                i = i + 2
+            end
+        end
+
         if -- >?< → ?< or ?>
             ir[i][1] == ">" and
             is_in(ir[i + 1][1], { "+", "-", "=", ".", "," }) and
@@ -944,6 +982,11 @@ bf_utils.optimize_ir = function(ir, optimization)
     return optimized_ir
 end
 
+--- Optimize the intermediate representation, part 2.
+--- This function applies optimizations that rely on the initial value of the memory.
+--- @tparam table ir intermediate representation
+--- @tparam int optimization optimization level
+--- @treturn table optimized intermediate representation
 bf_utils.optimize_ir2 = function(ir, optimization)
     if optimization < 2 then
         return ir
