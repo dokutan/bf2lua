@@ -628,6 +628,69 @@ bf_utils.optimize_ir = function(ir, optimization)
             end
         end
 
+        if -- ] and add-to2 → ] and move-to2
+            ir[i][1] == "]" and
+            ir[i + 1][1] == "add-to2"
+        then
+            local loop_ptr_offset = nil
+            local loop_depth = 1
+            local depth = ir[i][2]
+            local to_ptr_offset = ir[i + 1][5]
+
+            for j = i-1, 1, -1 do
+                if
+                    ir[j][1] == "]"
+                then
+                    loop_depth = loop_depth + 1
+                elseif
+                    ir[j][1] == "[" or ir[j][1] == "if"
+                then
+                    loop_depth = loop_depth - 1
+                    if loop_depth <= 0 then
+                        loop_ptr_offset = ir[j][4]
+                        break
+                    end
+                end
+            end
+
+            if loop_ptr_offset == to_ptr_offset then
+                optimized_ir[#optimized_ir + 1] = { "]", depth }
+                optimized_ir[#optimized_ir + 1] = { "move-to2", ir[i + 1][2], ir[i + 1][3], ir[i + 1][4], ir[i + 1][5], ir[i + 1][6] }
+                i = i + 2
+            end
+        end
+
+        if -- ] and = → ]
+            ir[i][1] == "]" and
+            ir[i + 1][1] == "=" and ir[i + 1][3] == 0
+        then
+            local loop_ptr_offset = nil
+            local loop_depth = 1
+            local depth = ir[i][2]
+            local set_ptr_offset = ir[i + 1][4]
+
+            for j = i-1, 1, -1 do
+                if
+                    ir[j][1] == "]"
+                then
+                    loop_depth = loop_depth + 1
+                elseif
+                    ir[j][1] == "[" or ir[j][1] == "if"
+                then
+                    loop_depth = loop_depth - 1
+                    if loop_depth <= 0 then
+                        loop_ptr_offset = ir[j][4]
+                        break
+                    end
+                end
+            end
+
+            if loop_ptr_offset == set_ptr_offset then
+                optimized_ir[#optimized_ir + 1] = { "]", depth }
+                i = i + 2
+            end
+        end
+
         if -- >?< → ?< or ?>
             ir[i][1] == ">" and
             is_in(ir[i + 1][1], { "+", "-", "=", ".", "," }) and
