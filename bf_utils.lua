@@ -61,7 +61,9 @@ bf_utils.optimize_brainfuck = function(program, optimization, debugging)
         ["00"] = "0",
 
         -- the current cell is guaranteed to be zero after a loop
-        ["%]0"] = "]"
+        ["%]0"] = "]",
+
+        ["%[%]%[%]"] = "[]",
     }
 
     local sum = 0
