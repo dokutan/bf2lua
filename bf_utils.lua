@@ -1078,11 +1078,18 @@ bf_utils.optimize_ir2 = function(ir, optimization)
                 modified_cells[ptr + ir[i][5]] = true
             end
             i = i + 1
+        elseif ir[i][1] == "move-to2" and not modified_cells[ptr + ir[i][6]] then -- move-to2 → = at start of program
+            optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], 0, ir[i][5] }
+            modified_cells[ptr + ir[i][5]] = true
+            i = i + 1
         elseif ir[i][1] == "=" and not modified_cells[ptr + ir[i][4]] and ir[i][3] == 0 then -- remove = 0 at start of program
             i = i + 1
         elseif ir[i][1] == "=" then -- = at start of program
             optimized_ir[#optimized_ir + 1] = ir[i]
             modified_cells[ptr + ir[i][4]] = true
+            i = i + 1
+        elseif ir[i][1] == "." and not modified_cells[ptr + ir[i][4]] then -- . → print at start of program
+            optimized_ir[#optimized_ir + 1] = { "print", ir[i][2], {ir[i][3]} }
             i = i + 1
         elseif ir[i][1] == "print" then -- print at start of program
             optimized_ir[#optimized_ir + 1] = ir[i]
