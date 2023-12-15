@@ -838,6 +838,18 @@ bf_utils.optimize_ir = function(ir, optimization)
             optimized_ir[#optimized_ir + 1] = { ir[i][1], ir[i][2], ir[i][3], ir[i][4], ir[i][5], ir[i][6] }
             optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3] + ir[i][3], ir[i + 1][4] * ir[i][4], ir[i + 1][5], ir[i][6] }
             i = i + 2
+        elseif -- move-to2 (to = from) → remove or ±
+            ir[i][1] == "move-to2" and
+            ir[i][5] == ir[i][6] and
+            ir[i][4] == 1 -- ×1
+        then
+            local add = ir[i][3]
+            if add > 0 then
+                optimized_ir[#optimized_ir + 1] = { "+", ir[i][2], add, ir[i][5] }
+            elseif add < 0 then
+                optimized_ir[#optimized_ir + 1] = { "-", ir[i][2], -add, ir[i][5] }
+            end
+            i = i + 1
         elseif -- sort +, -, =
             is_in(ir[i][1], { "+", "-", "=" }) and
             is_in(ir[i + 1][1], { "+", "-", "=" }) and
