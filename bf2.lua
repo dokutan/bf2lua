@@ -145,16 +145,16 @@ local main = function()
     while #ir ~= ir_length do
         ir_length = #ir
         ir = bf_utils.optimize_ir2(ir, optimization)
-        ir = bf_utils.optimize_ir(ir, optimization)
-        ir = bf_utils.optimize_ir(ir, optimization)
-        ir = bf_utils.optimize_ir(ir, optimization)
-        ir = bf_utils.optimize_ir(ir, optimization)
-        ir = bf_utils.optimize_ir(ir, optimization)
-        ir = bf_utils.optimize_ir(ir, optimization)
-        ir = bf_utils.optimize_ir(ir, optimization)
-        ir = bf_utils.optimize_ir(ir, optimization)
-        ir = bf_utils.optimize_ir(ir, optimization)
-        ir = bf_utils.optimize_ir(ir, optimization)
+        ir = bf_utils.optimize_ir(ir, optimization, maximum)
+        ir = bf_utils.optimize_ir(ir, optimization, maximum)
+        ir = bf_utils.optimize_ir(ir, optimization, maximum)
+        ir = bf_utils.optimize_ir(ir, optimization, maximum)
+        ir = bf_utils.optimize_ir(ir, optimization, maximum)
+        ir = bf_utils.optimize_ir(ir, optimization, maximum)
+        ir = bf_utils.optimize_ir(ir, optimization, maximum)
+        ir = bf_utils.optimize_ir(ir, optimization, maximum)
+        ir = bf_utils.optimize_ir(ir, optimization, maximum)
+        ir = bf_utils.optimize_ir(ir, optimization, maximum)
     end
 
     -- open output

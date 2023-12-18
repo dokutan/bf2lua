@@ -185,8 +185,9 @@ end
 --- Optimize the intermediate representation.
 --- @tparam table ir intermediate representation
 --- @tparam int optimization optimization level
+--- @tparam int max maximal value of a cell, 0 for unbounded cells
 --- @treturn table optimized intermediate representation
-bf_utils.optimize_ir = function(ir, optimization)
+bf_utils.optimize_ir = function(ir, optimization, max)
     if optimization < 2 then
         return ir
     end
@@ -195,8 +196,9 @@ bf_utils.optimize_ir = function(ir, optimization)
     local i = 1
     while i <= #ir - 2 do
         if -- while → if
-            ir[i][1] == "[" and ir[i][4] == 0
+            ir[i][1] == "["
         then
+            local ptr_offset = ir[i][4]
             local correct_instructions = true
             local current_cell_zero = false
             for j = i+1, #ir do
@@ -205,45 +207,46 @@ bf_utils.optimize_ir = function(ir, optimization)
                 elseif not is_in(ir[j][1], { "+", "-", "=", ".", "print", "add-to2", "move-to2" }) then
                     correct_instructions = false
                     break
-                elseif is_in(ir[j][1], { "+", "-", "=" }) and ir[j][3] ~= 0 and ir[j][4] == 0 then
+                elseif is_in(ir[j][1], { "+", "-", "=" }) and ir[j][3] ~= 0 and ir[j][4] == ptr_offset then
                     correct_instructions = false
                     break
-                elseif is_in(ir[j][1], { "add-to2", "move-to2" }) and ir[j][5] == 0 then
+                elseif is_in(ir[j][1], { "add-to2", "move-to2" }) and ir[j][5] == ptr_offset then
                     correct_instructions = false
                     break
-                elseif ir[j][1] == "=" and ir[j][3] == 0 and ir[j][4] == 0 then
+                elseif ir[j][1] == "=" and ir[j][3] == 0 and ir[j][4] == ptr_offset then
                     current_cell_zero = true
                 end
             end
 
 
             if correct_instructions and current_cell_zero then
-                optimized_ir[#optimized_ir + 1] = { "if", ir[i][2], nil, 0 }
+                optimized_ir[#optimized_ir + 1] = { "if", ir[i][2], nil, ptr_offset }
                 i = i + 1
             end
         end
 
         if -- while → if
-            ir[i][1] == "[" and ir[i][4] == 0
+            ir[i][1] == "["
         then
+            local ptr_offset = ir[i][4]
             local correct_instructions = true
             local current_cell_increment = 0
             for j = i+1, #ir do
                 if ir[j][1] == "]" then
                     break
-                elseif ir[j][1] == "+" and ir[j][4] == 0 then
+                elseif ir[j][1] == "+" and ir[j][4] == ptr_offset then
                     current_cell_increment = current_cell_increment + ir[j][3]
-                elseif ir[j][1] == "-" and ir[j][4] == 0 then
+                elseif ir[j][1] == "-" and ir[j][4] == ptr_offset then
                     current_cell_increment = current_cell_increment - ir[j][3]
-                elseif ir[j][1] ~= "=" or (ir[j][1] == "=" and ir[j][4] == 0) then
+                elseif ir[j][1] ~= "=" or (ir[j][1] == "=" and ir[j][4] == ptr_offset) then
                     correct_instructions = false
                     break
                 end
             end
 
             if correct_instructions and current_cell_increment == -1 then
-                optimized_ir[#optimized_ir + 1] = { "if", ir[i][2], nil, 0 }
-                optimized_ir[#optimized_ir + 1] = { "=", ir[i][2] + 1, 0, 0 }
+                optimized_ir[#optimized_ir + 1] = { "if", ir[i][2], nil, ptr_offset }
+                optimized_ir[#optimized_ir + 1] = { "=", ir[i][2] + 1, 0, ptr_offset }
                 i = i + 1
                 while ir[i][1] ~= "]" do
                     if ir[i][1] == "=" then
@@ -255,8 +258,9 @@ bf_utils.optimize_ir = function(ir, optimization)
         end
 
         if -- loop → add-to2
-            ir[i][1] == "[" and ir[i][4] == 0
+            ir[i][1] == "["
         then
+            local ptr_offset = ir[i][4]
             local correct_instructions = true
             local cell_deltas = {}
             for j = i+1, #ir do
@@ -272,19 +276,135 @@ bf_utils.optimize_ir = function(ir, optimization)
                 end
             end
 
-            if correct_instructions and cell_deltas[0] == -1 then
+            if correct_instructions and cell_deltas[ptr_offset] == -1 then
                 local depth = ir[i][2]
-                for ptr_offset, multiplied_by in pairs(cell_deltas) do
-                    if ptr_offset ~= 0 and multiplied_by ~= 0 then
-                        optimized_ir[#optimized_ir + 1] = { "add-to2", depth, 0, multiplied_by, ptr_offset, 0 }
+                for this_ptr_offset, multiplied_by in pairs(cell_deltas) do
+                    if this_ptr_offset ~= ptr_offset and multiplied_by ~= 0 then
+                        optimized_ir[#optimized_ir + 1] = { "add-to2", depth, 0, multiplied_by, this_ptr_offset, ptr_offset }
                     end
                 end
-                optimized_ir[#optimized_ir + 1] = { "=", depth, 0, 0 }
+                optimized_ir[#optimized_ir + 1] = { "=", depth, 0, ptr_offset }
 
                 while ir[i][1] ~= "]" do
                     i = i + 1
                 end
                 i = i + 1
+            end
+        end
+
+        if -- = and loop → ± and =
+            ir[i][1] == "[" and
+            max > 0
+        then
+            local ptr_offset = ir[i][4]
+            local correct_instructions = false
+            local cell_deltas = {}
+            local loop_value = nil
+
+            -- is the the value of the loop cell set?
+            for j = i-1, 1, -1 do
+                if ir[j][1] == "=" and ir[j][4] == ptr_offset then
+                    loop_value = ir[j][3] % (max + 1)
+                    correct_instructions = true
+                    break
+                elseif
+                    not ((is_in(ir[j][1], {"+", "-", "=", "."}) and ir[j][4] ~= ptr_offset) or
+                         (is_in(ir[j][1], {"add-to2", "move-to2"}) and ir[j][5] ~= ptr_offset) or
+                         ir[j][1] == "print")
+                then
+                    break
+                end
+            end
+
+            -- check instructions inside the loop
+            if correct_instructions then
+                for j = i+1, #ir do
+                    if ir[j][1] == "]" then
+                        break
+                    elseif not is_in(ir[j][1], { "+", "-" }) then
+                        correct_instructions = false
+                        break
+                    elseif ir[j][1] == "+" then
+                        cell_deltas[ir[j][4]] = (cell_deltas[ir[j][4]] or 0) + ir[j][3]
+                    elseif ir[j][1] == "-" then
+                        cell_deltas[ir[j][4]] = (cell_deltas[ir[j][4]] or 0) - ir[j][3]
+                    end
+                end
+            end
+
+            if correct_instructions and loop_value ~= nil then
+                local depth = ir[i][2]
+                local loop_exits = true
+                local loop_iterations = 0
+                local loop_history = {}
+                while loop_value ~= 0 do
+                    loop_history[loop_value] = true
+                    loop_value = (loop_value + cell_deltas[ptr_offset]) % (max + 1)
+                    if loop_history[loop_value] then
+                        loop_exits = false
+                        break
+                    end
+                    loop_iterations = loop_iterations + 1
+                end
+
+                if loop_exits then
+                    for this_ptr_offset, add_or_sub in pairs(cell_deltas) do
+                        if this_ptr_offset ~= ptr_offset and add_or_sub ~= 0 then
+                            add_or_sub = loop_iterations * add_or_sub
+                            if add_or_sub > 0 then
+                                optimized_ir[#optimized_ir + 1] = { "+", depth, add_or_sub, this_ptr_offset }
+                            elseif add_or_sub < 0 then
+                                optimized_ir[#optimized_ir + 1] = { "-", depth, -add_or_sub, this_ptr_offset }
+                            end
+                        end
+                    end
+                    optimized_ir[#optimized_ir + 1] = { "=", depth, 0, ptr_offset }
+
+                    while ir[i][1] ~= "]" do
+                        i = i + 1
+                    end
+                    i = i + 1
+                end
+            end
+        end
+
+        if -- ≶ and loop → loop and ≶
+            (ir[i][1] == "<" or ir[i][1] == ">") and
+            ir[i + 1][1] == "["
+        then
+            local correct_instructions = true
+            local depth = ir[i][2]
+            local ptr_offset = nil
+            if ir[i][1] == "<" then
+                ptr_offset = -ir[i][3]
+            else
+                ptr_offset = ir[i][3]
+            end
+
+            for j = i+2, #ir do
+                if ir[j][1] == "]" then
+                    break
+                elseif not is_in(ir[j][1], {"+", "-", "=", "."}) then
+                    correct_instructions = false
+                    break
+                end
+            end
+
+            if correct_instructions then
+                optimized_ir[#optimized_ir + 1] = { "[", depth, nil, ir[i + 1][4] + ptr_offset }
+                i = i + 2
+                while ir[i][1] ~= "]" do
+                    optimized_ir[#optimized_ir + 1] = { ir[i][1], ir[i][2], ir[i][3], ir[i][4] + ptr_offset }
+                    i = i + 1
+                end
+                optimized_ir[#optimized_ir + 1] = { "]", depth }
+                i = i + 1
+
+                if ptr_offset < 0 then
+                    optimized_ir[#optimized_ir + 1] = { "<", depth, -ptr_offset }
+                else
+                    optimized_ir[#optimized_ir + 1] = { ">", depth, ptr_offset }
+                end
             end
         end
 
