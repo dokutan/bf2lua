@@ -178,6 +178,12 @@ bf_utils.convert_brainfuck = function(program)
         end
     end
 
+    -- prevent the optimize_ir function from trying to index a nil value:
+    ir[#ir + 1] = { "noop" }
+    ir[#ir + 1] = { "noop" }
+    ir[#ir + 1] = { "noop" }
+    ir[#ir + 1] = { "noop" }
+    ir[#ir + 1] = { "noop" }
     return ir
 end
 
