@@ -109,6 +109,7 @@ end
 --- * {"move-to2", indentation depth, value =, value *, ptr offset to, ptr offset from}
 --- * {"print", indentation depth, bytes} print bytes
 --- * {"#", indentation depth} call bf_debug
+--- * {"mod", indentation depth}
 --- @tparam string program brainfuck program
 --- @treturn table intermediate representation
 bf_utils.convert_brainfuck = function(program)
@@ -117,8 +118,13 @@ bf_utils.convert_brainfuck = function(program)
     local skipped_zero = false -- indicates if zeroing a cell has been omitted from the output
     local ir = {}
 
-    for i = 1, #program do
-        if string.sub(program, i, i) == "[" then
+    local i = 1
+    while i <= #program do
+        if string.sub(program, i, i+23) == "[>->+<[>]>[<+>-]<<[<]>-]"  then
+            ir[#ir + 1] = { "mod", loops }
+            ir[#ir + 1] = { "=", loops, 0, 0 }
+            i = i + 23
+        elseif string.sub(program, i, i) == "[" then
             -- output_write("while (data[ptr] or 0) ~= 0 do\n")
             ir[#ir + 1] = { "[", loops, nil, 0 }
             loops = loops + 1
@@ -176,6 +182,8 @@ bf_utils.convert_brainfuck = function(program)
         elseif string.sub(program, i, i) == "#" then
             ir[#ir + 1] = { "#", loops }
         end
+
+        i = i + 1
     end
 
     -- prevent the optimize_ir function from trying to index a nil value:
@@ -1345,7 +1353,10 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
             lua_code = lua_code .. string.rep("\t", loops) .. str
         end
 
-        if command == "[" then
+        if command == "mod" then
+            output_write("data[ptr+2] = data[ptr] % data[ptr+1]\n")
+            output_write("data[ptr+1] = data[ptr+1] - (data[ptr] % data[ptr+1])\n")
+        elseif command == "[" then
             output_write("while data[ptr" .. ptr_offset(ir[i][4]) .. "] ~= 0 do\n")
 
             if functions then
