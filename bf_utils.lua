@@ -716,6 +716,37 @@ bf_utils.optimize_ir = function(ir, optimization, max)
             end
         end
 
+        if -- = and if → remove if
+            ir[i][1] == "=" and
+            ir[i+1][1] == "if" and
+            ir[i][4] == ir[i+1][4] and
+            ir[i][3] ~= 0
+        then
+            local loop_depth = 1
+
+            optimized_ir[#optimized_ir + 1] = { ir[i][1], ir[i][2], ir[i][3], ir[i][4] }
+            i = i + 2
+
+            for j = i, #ir do
+                if ir[j][1] == "if" or ir[j][1] == "[" then
+                    loop_depth = loop_depth + 1
+                    i = i + 1
+                    optimized_ir[#optimized_ir + 1] = { ir[j][1], ir[j][2]-1, ir[j][3], ir[j][4] }
+                elseif ir[j][1] == "]" and loop_depth == 1 then
+                    i = i + 1
+                    break
+                elseif ir[j][1] == "]" then
+                    loop_depth = loop_depth - 1
+                    i = i + 1
+                    optimized_ir[#optimized_ir + 1] = { ir[j][1], ir[j][2]-1 }
+                else
+                    i = i + 1
+                   -- print(ir[j][1], ir[j][2], ir[j][3], ir[j][4], ir[j][5], ir[j][6])
+                    optimized_ir[#optimized_ir + 1] = { ir[j][1], ir[j][2]-1, ir[j][3], ir[j][4], ir[j][5], ir[j][6] }
+                end
+            end
+        end
+
         if -- ] and ± → ] and =
             ir[i][1] == "]" and
             (ir[i + 1][1] == "+" or ir[i + 1][1] == "-")
