@@ -5,8 +5,10 @@ local bf_utils = {}
 
 local fast_math_snippets = {
     mod = "[>->+<[>]>[<+>-]<<[<]>-]",
+    divmod = "[->-[>+>>]>[[-<+>]+>+>>]<<<<<]",
     print100 = ">>++++++++++<<[->+>-[>+>>]>[+[-<+>]>+>>]<<<<<<]>>[-]>>>++++++++++<[->-[>+>>]>[+[-<+>]>+>>]<<<<<]>[-]>>[-]<[<[->-<]++++++[->++++++++<]>.[-]]<<++++++[-<++++++++>]<.[-]<<[-<+>]<",
     print1000 = ">>++++++++++<<[->+>-[>+>>]>[+[-<+>]>+>>]<<<<<<]>>[-]>>>++++++++++<[->-[>+>>]>[+[-<+>]>+>>]<<<<<]>[-]>>[>++++++[-<++++++++>]<.<<+>+>[-]]<[<[->-<]++++++[->++++++++<]>.[-]]<<++++++[-<++++++++>]<.[-]<<[-<+>]<",
+    print = ">+[[-]<[->+<[->+<[->+<[->+<[->+<[->+<[->+<[->+<[->+<[->[-]>>+>+<<<]]]]]]]]]<]>>[>]++++++[-<++++++++>]>>]<<<[.[-]<<<]",
 
     -- https://esolangs.org/wiki/Brainfuck_bitwidth_conversions 1→2
     plus_1_2 = "+[<+>>>+<<-]<[>+<-]+>>>[<<<->>>[-]]<<<[->>+<<]>",
@@ -159,6 +161,11 @@ bf_utils.convert_brainfuck = function(program)
             ir[#ir + 1] = { "=", loops, 0, 0 }
             i = i + contains_at_bf(program, i, fast_math_snippets.mod)
 
+        elseif contains_at_bf(program, i, fast_math_snippets.divmod) then
+            ir[#ir + 1] = { "divmod", loops }
+            ir[#ir + 1] = { "=", loops, 0, 0 }
+            i = i + contains_at_bf(program, i, fast_math_snippets.divmod)
+
         elseif contains_at_bf(program, i, fast_math_snippets.print100) then
             ir[#ir + 1] = { "print%100", loops }
             i = i + contains_at_bf(program, i, fast_math_snippets.print100)
@@ -166,6 +173,12 @@ bf_utils.convert_brainfuck = function(program)
         elseif contains_at_bf(program, i, fast_math_snippets.print1000) then
             ir[#ir + 1] = { "print%1000", loops }
             i = i + contains_at_bf(program, i, fast_math_snippets.print1000)
+
+        elseif contains_at_bf(program, i, fast_math_snippets.print) then
+            ir[#ir + 1] = { "print_number", loops }
+            ir[#ir + 1] = { "=", loops, 0, 0 }
+            ir[#ir + 1] = { "<", loops, 2 }
+            i = i + contains_at_bf(program, i, fast_math_snippets.print)
 
         elseif contains_at_bf(program, i, fast_math_snippets.plus_1_2) then
             ir[#ir + 1] = { "plus_1_2", loops }
@@ -1430,8 +1443,15 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
         end
 
         if command == "mod" then
-            output_write("data[ptr+2] = data[ptr] % data[ptr+1]\n")
-            output_write("data[ptr+1] = data[ptr+1] - (data[ptr] % data[ptr+1])\n")
+            output_write("local d = (data[ptr + 1] ~= 0 and data[ptr + 1] or max)\n")
+            output_write("data[ptr + 2] = data[ptr] % d\n")
+            output_write("data[ptr + 1] = d - (data[ptr] % d)\n")
+        elseif command == "divmod" then
+            output_write("local n = data[ptr]\n")
+            output_write("local d = (data[ptr + 1] ~= 0 and data[ptr + 1] or max)\n")
+            output_write("data[ptr+1] = d - n % d\n")
+            output_write("data[ptr+2] = (n % d + 1)" .. mod_max .. "\n")
+            output_write("data[ptr+3] = n // d\n")
         elseif command == "[" then
             output_write("while data[ptr" .. ptr_offset(ir[i][4]) .. "] ~= 0 do\n")
 
@@ -1548,6 +1568,8 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
             output_write("io.write(data[ptr] % 100)\n")
         elseif command == "print%1000" then
             output_write("io.write(data[ptr] % 1000)\n")
+        elseif command == "print_number" then
+            output_write("io.write(data[ptr])\n")
         elseif command == "plus_1_2" then
             output_write("local x = data[ptr] + max * data[ptr + 1] + 1\n")
             output_write("data[ptr] = x % max\n")
