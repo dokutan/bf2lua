@@ -7,6 +7,8 @@ local fast_math_snippets = {
     mod = "[>->+<[>]>[<+>-]<<[<]>-]",
     print100 = ">>++++++++++<<[->+>-[>+>>]>[+[-<+>]>+>>]<<<<<<]>>[-]>>>++++++++++<[->-[>+>>]>[+[-<+>]>+>>]<<<<<]>[-]>>[-]<[<[->-<]++++++[->++++++++<]>.[-]]<<++++++[-<++++++++>]<.[-]<<[-<+>]<",
     print1000 = ">>++++++++++<<[->+>-[>+>>]>[+[-<+>]>+>>]<<<<<<]>>[-]>>>++++++++++<[->-[>+>>]>[+[-<+>]>+>>]<<<<<]>[-]>>[>++++++[-<++++++++>]<.<<+>+>[-]]<[<[->-<]++++++[->++++++++<]>.[-]]<<++++++[-<++++++++>]<.[-]<<[-<+>]<",
+    plus_1_2nc = ">+<+[>-]>[->>+<]<<",
+    minus_1_2nc = ">+<[>-]>[->>-<]<<-",
 }
 
 local function is_in(key, set)
@@ -152,6 +154,12 @@ bf_utils.convert_brainfuck = function(program)
         elseif contains_at_bf(program, i, fast_math_snippets.print1000) then
             ir[#ir + 1] = { "print%1000", loops }
             i = i + contains_at_bf(program, i, fast_math_snippets.print1000)
+        elseif contains_at_bf(program, i, fast_math_snippets.plus_1_2nc) then
+            ir[#ir + 1] = { "plus_1_2nc", loops }
+            i = i + contains_at_bf(program, i, fast_math_snippets.plus_1_2nc)
+        elseif contains_at_bf(program, i, fast_math_snippets.minus_1_2nc) then
+            ir[#ir + 1] = { "minus_1_2nc", loops }
+            i = i + contains_at_bf(program, i, fast_math_snippets.minus_1_2nc)
         elseif string.sub(program, i, i) == "[" then
             ir[#ir + 1] = { "[", loops, nil, 0 }
             loops = loops + 1
@@ -1497,9 +1505,17 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
             end
             output_write("io.write(\"" .. bytes .. "\")\n")
         elseif command == "print%100" then
-            output_write("io.write(data[ptr]%100)\n")
+            output_write("io.write(data[ptr] % 100)\n")
         elseif command == "print%1000" then
-            output_write("io.write(data[ptr]%1000)\n")
+            output_write("io.write(data[ptr] % 1000)\n")
+        elseif command == "plus_1_2nc" then
+            output_write("local x = data[ptr] + max * data[ptr + 3] + 1\n")
+            output_write("data[ptr] = x % max\n")
+            output_write("data[ptr+3] = x // max\n")
+        elseif command == "minus_1_2nc" then
+            output_write("local x = data[ptr] + max * data[ptr + 3] - 1\n")
+            output_write("data[ptr] = x % max\n")
+            output_write("data[ptr+3] = x // max\n")
         elseif command == "#" and debugging then
             output_write("bf_debug()\n")
         end
