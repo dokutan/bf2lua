@@ -18,7 +18,7 @@ Options:
 -h --help         print this message
 -i --input FILE   input file, - for stdin
 -o --output FILE  output file, - for stdout
--O --optimize 0-2 optimization level, the default is 1
+-O --optimize 0-3 optimization level, the default is 1
 -f --functions    create a function for each loop
                   this improves compatibility with luajit and lua<5.4
 -g --debug        enable the '#' command, which prints debug info to stderr
@@ -140,7 +140,7 @@ local main = function()
 
     -- optimize brainfuck code
     bfcode = bf_utils.optimize_brainfuck(bfcode, optimization, debugging)
-    ir = bf_utils.convert_brainfuck(bfcode)
+    ir = bf_utils.convert_brainfuck(bfcode, optimization)
     ir = bf_utils.optimize_ir0(ir, optimization)
     local ir_length = #ir + 1
     while #ir ~= ir_length do

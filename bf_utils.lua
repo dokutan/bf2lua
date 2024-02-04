@@ -148,65 +148,65 @@ end
 --- * {"print%100", indentation depth}
 --- * {"print%1000", indentation depth}
 --- @tparam string program brainfuck program
+--- @tparam int optimization optimization level
 --- @treturn table intermediate representation
-bf_utils.convert_brainfuck = function(program)
+bf_utils.convert_brainfuck = function(program, optimization)
     local loops = 0
-    local counter = 1          -- used to count and join repeating commands
-    local skipped_zero = false -- indicates if zeroing a cell has been omitted from the output
     local ir = {}
+    local use_fast_math = (optimization > 2)
 
     local i = 1
     while i <= #program do
-        if contains_at_bf(program, i, fast_math_snippets.mod) then
+        if use_fast_math and contains_at_bf(program, i, fast_math_snippets.mod) then
             ir[#ir + 1] = { "mod", loops }
             ir[#ir + 1] = { "=", loops, 0, 0 }
             i = i + contains_at_bf(program, i, fast_math_snippets.mod)
 
-        elseif contains_at_bf(program, i, fast_math_snippets.divmod) then
+        elseif use_fast_math and contains_at_bf(program, i, fast_math_snippets.divmod) then
             ir[#ir + 1] = { "divmod", loops }
             ir[#ir + 1] = { "=", loops, 0, 0 }
             i = i + contains_at_bf(program, i, fast_math_snippets.divmod)
 
-        elseif contains_at_bf(program, i, fast_math_snippets.print100) then
+        elseif use_fast_math and contains_at_bf(program, i, fast_math_snippets.print100) then
             ir[#ir + 1] = { "print%100", loops }
             i = i + contains_at_bf(program, i, fast_math_snippets.print100)
 
-        elseif contains_at_bf(program, i, fast_math_snippets.print1000) then
+        elseif use_fast_math and contains_at_bf(program, i, fast_math_snippets.print1000) then
             ir[#ir + 1] = { "print%1000", loops }
             i = i + contains_at_bf(program, i, fast_math_snippets.print1000)
 
-        elseif contains_at_bf(program, i, fast_math_snippets.print) then
+        elseif use_fast_math and contains_at_bf(program, i, fast_math_snippets.print) then
             ir[#ir + 1] = { "print_number", loops }
             ir[#ir + 1] = { "=", loops, 0, 0 }
             ir[#ir + 1] = { "<", loops, 2 }
             i = i + contains_at_bf(program, i, fast_math_snippets.print)
 
-        elseif contains_at_bf(program, i, fast_math_snippets.plus_1_2) then
+        elseif use_fast_math and contains_at_bf(program, i, fast_math_snippets.plus_1_2) then
             ir[#ir + 1] = { "plus_1_2", loops }
             i = i + contains_at_bf(program, i, fast_math_snippets.plus_1_2)
 
-        elseif contains_at_bf(program, i, fast_math_snippets.minus_1_2) then
+        elseif use_fast_math and contains_at_bf(program, i, fast_math_snippets.minus_1_2) then
             ir[#ir + 1] = { "minus_1_2", loops }
             i = i + contains_at_bf(program, i, fast_math_snippets.minus_1_2)
 
-        elseif contains_at_bf(program, i, fast_math_snippets.plus_1_2nc) then
+        elseif use_fast_math and contains_at_bf(program, i, fast_math_snippets.plus_1_2nc) then
             ir[#ir + 1] = { "plus_1_2nc", loops }
             i = i + contains_at_bf(program, i, fast_math_snippets.plus_1_2nc)
 
-        elseif contains_at_bf(program, i, fast_math_snippets.minus_1_2nc) then
+        elseif use_fast_math and contains_at_bf(program, i, fast_math_snippets.minus_1_2nc) then
             ir[#ir + 1] = { "minus_1_2nc", loops }
             i = i + contains_at_bf(program, i, fast_math_snippets.minus_1_2nc)
 
-        elseif contains_at_bf(program, i, fast_math_snippets.is_zero_1_2nc) then
+        elseif use_fast_math and contains_at_bf(program, i, fast_math_snippets.is_zero_1_2nc) then
             ir[#ir + 1] = { "is_zero_1_2nc", loops }
             ir[#ir + 1] = { ">", loops, 1 }
             i = i + contains_at_bf(program, i, fast_math_snippets.is_zero_1_2nc)
 
-        elseif contains_at_bf(program, i, fast_math_snippets.plus_1_2cc) then
+        elseif use_fast_math and contains_at_bf(program, i, fast_math_snippets.plus_1_2cc) then
             ir[#ir + 1] = { "plus_1_2cc", loops }
             i = i + contains_at_bf(program, i, fast_math_snippets.plus_1_2cc)
 
-        elseif contains_at_bf(program, i, fast_math_snippets.minus_1_2cc) then
+        elseif use_fast_math and contains_at_bf(program, i, fast_math_snippets.minus_1_2cc) then
             ir[#ir + 1] = { "minus_1_2cc", loops }
             i = i + contains_at_bf(program, i, fast_math_snippets.minus_1_2cc)
 
