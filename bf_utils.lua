@@ -6,6 +6,7 @@ local bf_utils = {}
 local fast_math_snippets = {
     mod = "[>->+<[>]>[<+>-]<<[<]>-]",
     print100 = ">>++++++++++<<[->+>-[>+>>]>[+[-<+>]>+>>]<<<<<<]>>[-]>>>++++++++++<[->-[>+>>]>[+[-<+>]>+>>]<<<<<]>[-]>>[-]<[<[->-<]++++++[->++++++++<]>.[-]]<<++++++[-<++++++++>]<.[-]<<[-<+>]<",
+    print1000 = ">>++++++++++<<[->+>-[>+>>]>[+[-<+>]>+>>]<<<<<<]>>[-]>>>++++++++++<[->-[>+>>]>[+[-<+>]>+>>]<<<<<]>[-]>>[>++++++[-<++++++++>]<.<<+>+>[-]]<[<[->-<]++++++[->++++++++<]>.[-]]<<++++++[-<++++++++>]<.[-]<<[-<+>]<",
 }
 
 local function is_in(key, set)
@@ -148,6 +149,9 @@ bf_utils.convert_brainfuck = function(program)
         elseif contains_at_bf(program, i, fast_math_snippets.print100) then
             ir[#ir + 1] = { "print%100", loops }
             i = i + contains_at_bf(program, i, fast_math_snippets.print100)
+        elseif contains_at_bf(program, i, fast_math_snippets.print1000) then
+            ir[#ir + 1] = { "print%1000", loops }
+            i = i + contains_at_bf(program, i, fast_math_snippets.print1000)
         elseif string.sub(program, i, i) == "[" then
             ir[#ir + 1] = { "[", loops, nil, 0 }
             loops = loops + 1
