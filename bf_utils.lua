@@ -7,8 +7,18 @@ local fast_math_snippets = {
     mod = "[>->+<[>]>[<+>-]<<[<]>-]",
     print100 = ">>++++++++++<<[->+>-[>+>>]>[+[-<+>]>+>>]<<<<<<]>>[-]>>>++++++++++<[->-[>+>>]>[+[-<+>]>+>>]<<<<<]>[-]>>[-]<[<[->-<]++++++[->++++++++<]>.[-]]<<++++++[-<++++++++>]<.[-]<<[-<+>]<",
     print1000 = ">>++++++++++<<[->+>-[>+>>]>[+[-<+>]>+>>]<<<<<<]>>[-]>>>++++++++++<[->-[>+>>]>[+[-<+>]>+>>]<<<<<]>[-]>>[>++++++[-<++++++++>]<.<<+>+>[-]]<[<[->-<]++++++[->++++++++<]>.[-]]<<++++++[-<++++++++>]<.[-]<<[-<+>]<",
+
+    -- https://esolangs.org/wiki/Brainfuck_bitwidth_conversions 1→2
+    plus_1_2 = "+[<+>>>+<<-]<[>+<-]+>>>[<<<->>>[-]]<<<[->>+<<]>",
+    minus_1_2 = "[<+>>>+<<-]<[>+<-]+>>>[<<<->>>[-]]<<<[->>-<<]>-",
+
+    -- https://esolangs.org/wiki/Brainfuck_bitwidth_conversions 1→2 No Copy
     plus_1_2nc = ">+<+[>-]>[->>+<]<<",
     minus_1_2nc = ">+<[>-]>[->>-<]<<-",
+
+    -- https://esolangs.org/wiki/Brainfuck_bitwidth_conversions 1→2 Compact Copy
+    plus_1_2cc = "+>+[<->[->>+<<]]>>[-<<+>>]<<<[->>+<<]",
+    minus_1_2cc = "+>[<->[->>+<<]]>>[-<<+>>]<<<[->>-<<]>-<",
 }
 
 local function is_in(key, set)
@@ -148,38 +158,68 @@ bf_utils.convert_brainfuck = function(program)
             ir[#ir + 1] = { "mod", loops }
             ir[#ir + 1] = { "=", loops, 0, 0 }
             i = i + contains_at_bf(program, i, fast_math_snippets.mod)
+
         elseif contains_at_bf(program, i, fast_math_snippets.print100) then
             ir[#ir + 1] = { "print%100", loops }
             i = i + contains_at_bf(program, i, fast_math_snippets.print100)
+
         elseif contains_at_bf(program, i, fast_math_snippets.print1000) then
             ir[#ir + 1] = { "print%1000", loops }
             i = i + contains_at_bf(program, i, fast_math_snippets.print1000)
+
+        elseif contains_at_bf(program, i, fast_math_snippets.plus_1_2) then
+            ir[#ir + 1] = { "plus_1_2", loops }
+            i = i + contains_at_bf(program, i, fast_math_snippets.plus_1_2)
+
+        elseif contains_at_bf(program, i, fast_math_snippets.minus_1_2) then
+            ir[#ir + 1] = { "minus_1_2", loops }
+            i = i + contains_at_bf(program, i, fast_math_snippets.minus_1_2)
+
         elseif contains_at_bf(program, i, fast_math_snippets.plus_1_2nc) then
             ir[#ir + 1] = { "plus_1_2nc", loops }
             i = i + contains_at_bf(program, i, fast_math_snippets.plus_1_2nc)
+
         elseif contains_at_bf(program, i, fast_math_snippets.minus_1_2nc) then
             ir[#ir + 1] = { "minus_1_2nc", loops }
             i = i + contains_at_bf(program, i, fast_math_snippets.minus_1_2nc)
+
+        elseif contains_at_bf(program, i, fast_math_snippets.plus_1_2cc) then
+            ir[#ir + 1] = { "plus_1_2cc", loops }
+            i = i + contains_at_bf(program, i, fast_math_snippets.plus_1_2cc)
+
+        elseif contains_at_bf(program, i, fast_math_snippets.minus_1_2cc) then
+            ir[#ir + 1] = { "minus_1_2cc", loops }
+            i = i + contains_at_bf(program, i, fast_math_snippets.minus_1_2cc)
+
         elseif string.sub(program, i, i) == "[" then
             ir[#ir + 1] = { "[", loops, nil, 0 }
             loops = loops + 1
+
         elseif string.sub(program, i, i) == "]" then
             loops = loops - 1
             ir[#ir + 1] = { "]", loops }
+
         elseif string.sub(program, i, i) == "," then
             ir[#ir + 1] = { ",", loops, nil, 0 }
+
         elseif string.sub(program, i, i) == "." then
             ir[#ir + 1] = { ".", loops, 0, 0 }
+
         elseif string.sub(program, i, i) == "+" then
             ir[#ir + 1] = { "+", loops, 1, 0 }
+
         elseif string.sub(program, i, i) == "-" then
             ir[#ir + 1] = { "-", loops, 1, 0 }
+
         elseif string.sub(program, i, i) == "<" then
             ir[#ir + 1] = { "<", loops, 1 }
+
         elseif string.sub(program, i, i) == ">" then
             ir[#ir + 1] = { ">", loops, 1 }
+
         elseif string.sub(program, i, i) == "0" then
             ir[#ir + 1] = { "=", loops, 0, 0 }
+
         elseif string.sub(program, i, i) == "#" then
             ir[#ir + 1] = { "#", loops }
         end
@@ -1508,14 +1548,30 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
             output_write("io.write(data[ptr] % 100)\n")
         elseif command == "print%1000" then
             output_write("io.write(data[ptr] % 1000)\n")
+        elseif command == "plus_1_2" then
+            output_write("local x = data[ptr] + max * data[ptr + 1] + 1\n")
+            output_write("data[ptr] = x % max\n")
+            output_write("data[ptr + 1] = (x // max)" .. mod_max .. "\n")
+        elseif command == "minus_1_2" then
+            output_write("local x = data[ptr] + max * data[ptr + 1] - 1\n")
+            output_write("data[ptr] = x % max\n")
+            output_write("data[ptr + 1] = (x // max)" .. mod_max .. "\n")
         elseif command == "plus_1_2nc" then
             output_write("local x = data[ptr] + max * data[ptr + 3] + 1\n")
             output_write("data[ptr] = x % max\n")
-            output_write("data[ptr+3] = x // max\n")
+            output_write("data[ptr + 3] = (x // max)" .. mod_max .. "\n")
         elseif command == "minus_1_2nc" then
             output_write("local x = data[ptr] + max * data[ptr + 3] - 1\n")
             output_write("data[ptr] = x % max\n")
-            output_write("data[ptr+3] = x // max\n")
+            output_write("data[ptr + 3] = (x // max)" .. mod_max .. "\n")
+        elseif command == "plus_1_2cc" then
+            output_write("local x = data[ptr + 1] + max * data[ptr + 2] + 1\n")
+            output_write("data[ptr + 1] = x % max\n")
+            output_write("data[ptr + 2] = (x // max)" .. mod_max .. "\n")
+        elseif command == "minus_1_2cc" then
+            output_write("local x = data[ptr + 1] + max * data[ptr + 2] - 1\n")
+            output_write("data[ptr + 1] = x % max\n")
+            output_write("data[ptr + 2] = (x // max)" .. mod_max .. "\n")
         elseif command == "#" and debugging then
             output_write("bf_debug()\n")
         end
