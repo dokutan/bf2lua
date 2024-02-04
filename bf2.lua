@@ -141,6 +141,7 @@ local main = function()
     -- optimize brainfuck code
     bfcode = bf_utils.optimize_brainfuck(bfcode, optimization, debugging)
     ir = bf_utils.convert_brainfuck(bfcode)
+    ir = bf_utils.optimize_ir0(ir, optimization)
     local ir_length = #ir + 1
     while #ir ~= ir_length do
         ir_length = #ir

@@ -3,6 +3,11 @@
 
 local bf_utils = {}
 
+local fast_math_snippets = {
+    mod = "[>->+<[>]>[<+>-]<<[<]>-]",
+    print100 = ">>++++++++++<<[->+>-[>+>>]>[+[-<+>]>+>>]<<<<<<]>>[-]>>>++++++++++<[->-[>+>>]>[+[-<+>]>+>>]<<<<<]>[-]>>[-]<[<[->-<]++++++[->++++++++<]>.[-]]<<++++++[-<++++++++>]<.[-]<<[-<+>]<",
+}
+
 local function is_in(key, set)
     for _, v in ipairs(set) do
         if key == v then
@@ -12,6 +17,20 @@ local function is_in(key, set)
     return false
 end
 
+--- Check if program contains str at i
+--- @tparam string program brainfuck program
+--- @tparam int i
+--- @tparam string str
+--- @treturn int|nil number of matched chars
+local function contains_at_bf(program, i, str)
+    local str_opt = bf_utils.optimize_brainfuck(str, 1, false)
+    if string.sub(program, i, i+#str-1) == str then
+        return #str-1
+    elseif string.sub(program, i, i+#str_opt-1) == str_opt then
+        return #str_opt-1
+    end
+    return nil
+end
 
 --- Read brainfuck code from `file`.
 --- @tparam file file input file
@@ -110,6 +129,8 @@ end
 --- * {"print", indentation depth, bytes} print bytes
 --- * {"#", indentation depth} call bf_debug
 --- * {"mod", indentation depth}
+--- * {"print%100", indentation depth}
+--- * {"print%1000", indentation depth}
 --- @tparam string program brainfuck program
 --- @treturn table intermediate representation
 bf_utils.convert_brainfuck = function(program)
@@ -120,12 +141,14 @@ bf_utils.convert_brainfuck = function(program)
 
     local i = 1
     while i <= #program do
-        if string.sub(program, i, i+23) == "[>->+<[>]>[<+>-]<<[<]>-]"  then
+        if contains_at_bf(program, i, fast_math_snippets.mod) then
             ir[#ir + 1] = { "mod", loops }
             ir[#ir + 1] = { "=", loops, 0, 0 }
-            i = i + 23
+            i = i + contains_at_bf(program, i, fast_math_snippets.mod)
+        elseif contains_at_bf(program, i, fast_math_snippets.print100) then
+            ir[#ir + 1] = { "print%100", loops }
+            i = i + contains_at_bf(program, i, fast_math_snippets.print100)
         elseif string.sub(program, i, i) == "[" then
-            -- output_write("while (data[ptr] or 0) ~= 0 do\n")
             ir[#ir + 1] = { "[", loops, nil, 0 }
             loops = loops + 1
         elseif string.sub(program, i, i) == "]" then
@@ -136,49 +159,15 @@ bf_utils.convert_brainfuck = function(program)
         elseif string.sub(program, i, i) == "." then
             ir[#ir + 1] = { ".", loops, 0, 0 }
         elseif string.sub(program, i, i) == "+" then
-            if string.sub(program, i + 1, i + 1) == "+" then
-                counter = counter + 1
-            elseif skipped_zero then
-                ir[#ir + 1] = { "=", loops, counter, 0 }
-                counter = 1
-                skipped_zero = false
-            else
-                ir[#ir + 1] = { "+", loops, counter, 0 }
-                counter = 1
-            end
+            ir[#ir + 1] = { "+", loops, 1, 0 }
         elseif string.sub(program, i, i) == "-" then
-            if string.sub(program, i + 1, i + 1) == "-" then
-                counter = counter + 1
-            elseif skipped_zero then
-                ir[#ir + 1] = { "=", loops, -counter, 0 }
-                counter = 1
-                skipped_zero = false
-            else
-                ir[#ir + 1] = { "-", loops, counter, 0 }
-                counter = 1
-            end
+            ir[#ir + 1] = { "-", loops, 1, 0 }
         elseif string.sub(program, i, i) == "<" then
-            if string.sub(program, i + 1, i + 1) == "<" then
-                counter = counter + 1
-            else
-                ir[#ir + 1] = { "<", loops, counter }
-                counter = 1
-            end
+            ir[#ir + 1] = { "<", loops, 1 }
         elseif string.sub(program, i, i) == ">" then
-            if string.sub(program, i + 1, i + 1) == ">" then
-                counter = counter + 1
-            else
-                ir[#ir + 1] = { ">", loops, counter }
-                counter = 1
-            end
+            ir[#ir + 1] = { ">", loops, 1 }
         elseif string.sub(program, i, i) == "0" then
-            if string.sub(program, i + 1, i + 1) == "+" or
-                string.sub(program, i + 1, i + 1) == "-" then
-                -- setting this cell to zero can be skipped, because the value will be set with the next instruction
-                skipped_zero = true
-            else
-                ir[#ir + 1] = { "=", loops, 0, 0 }
-            end
+            ir[#ir + 1] = { "=", loops, 0, 0 }
         elseif string.sub(program, i, i) == "#" then
             ir[#ir + 1] = { "#", loops }
         end
@@ -195,6 +184,41 @@ bf_utils.convert_brainfuck = function(program)
     return ir
 end
 
+
+--- Merge repeated identical instructions
+--- @tparam table ir intermediate representation
+--- @tparam int optimization optimization level
+--- @treturn table optimized intermediate representation
+bf_utils.optimize_ir0 = function(ir, optimization)
+    if optimization < 1 then
+        return ir
+    end
+
+    local new_ir = {}
+    local i = 1
+    while i <= #ir do
+        if is_in(ir[i][1], { "+", "-", ">", "<" }) then
+            local instruction = ir[i][1]
+            local depth = ir[i][2]
+            local count = ir[i][3]
+            local ptr_offset = ir[i][4]
+            for j=i+1,#ir do
+                if ir[j][1] == instruction and ir[j][4] == ptr_offset then
+                    count = count + ir[j][3]
+                    i = i + 1
+                else
+                    break
+                end
+            end
+            new_ir[#new_ir+1] = { instruction, depth, count, ptr_offset }
+        else
+            new_ir[#new_ir+1] = ir[i]
+        end
+        i = i + 1
+    end
+
+    return new_ir
+end
 
 --- Optimize the intermediate representation.
 --- @tparam table ir intermediate representation
@@ -1468,6 +1492,10 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
                 bytes = bytes .. byte
             end
             output_write("io.write(\"" .. bytes .. "\")\n")
+        elseif command == "print%100" then
+            output_write("io.write(data[ptr]%100)\n")
+        elseif command == "print%1000" then
+            output_write("io.write(data[ptr]%1000)\n")
         elseif command == "#" and debugging then
             output_write("bf_debug()\n")
         end
