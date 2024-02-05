@@ -15,7 +15,7 @@ local fast_math_snippets = {
     minus_1_2 = "[<+>>>+<<-]<[>+<-]+>>>[<<<->>>[-]]<<<[->>-<<]>-",
 
     -- https://esolangs.org/wiki/Brainfuck_bitwidth_conversions 1→2 No Copy
-    plus_1_2nc = ">+<+[>-]>[->>+<]<<",
+    plus_1_2nc = "+<+[>-]>[->>+<]",
     minus_1_2nc = ">+<[>-]>[->>-<]<<-",
     is_zero_1_2nc = ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-",
 
@@ -191,6 +191,7 @@ bf_utils.convert_brainfuck = function(program, optimization)
 
         elseif use_fast_math and contains_at_bf(program, i, fast_math_snippets.plus_1_2nc) then
             ir[#ir + 1] = { "plus_1_2nc", loops }
+            ir[#ir + 1] = { ">", loops, 1 }
             i = i + contains_at_bf(program, i, fast_math_snippets.plus_1_2nc)
 
         elseif use_fast_math and contains_at_bf(program, i, fast_math_snippets.minus_1_2nc) then
@@ -1585,9 +1586,9 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
             output_write("data[ptr] = x % max\n")
             output_write("data[ptr + 1] = (x // max)" .. mod_max .. "\n")
         elseif command == "plus_1_2nc" then
-            output_write("local x = data[ptr] + max * data[ptr + 3] + 1\n")
-            output_write("data[ptr] = x % max\n")
-            output_write("data[ptr + 3] = (x // max)" .. mod_max .. "\n")
+            output_write("local x = data[ptr - 1] + max * data[ptr + 2] + 1\n")
+            output_write("data[ptr - 1] = x % max\n")
+            output_write("data[ptr + 2] = (x // max)" .. mod_max .. "\n")
         elseif command == "minus_1_2nc" then
             output_write("local x = data[ptr] + max * data[ptr + 3] - 1\n")
             output_write("data[ptr] = x % max\n")
