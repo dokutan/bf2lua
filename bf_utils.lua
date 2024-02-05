@@ -147,6 +147,7 @@ end
 --- * {"mod", indentation depth}
 --- * {"print%100", indentation depth}
 --- * {"print%1000", indentation depth}
+--- * {"+1→2", indentation depth, ptr offset low, ptr offset high, value}
 --- @tparam string program brainfuck program
 --- @tparam int optimization optimization level
 --- @treturn table intermediate representation
@@ -190,7 +191,7 @@ bf_utils.convert_brainfuck = function(program, optimization)
             i = i + contains_at_bf(program, i, fast_math_snippets.minus_1_2)
 
         elseif use_fast_math and contains_at_bf(program, i, fast_math_snippets.plus_1_2nc) then
-            ir[#ir + 1] = { "plus_1_2nc", loops }
+            ir[#ir + 1] = { "+1→2", loops, -1, 2, 1 }
             ir[#ir + 1] = { ">", loops, 1 }
             i = i + contains_at_bf(program, i, fast_math_snippets.plus_1_2nc)
 
@@ -1040,6 +1041,20 @@ bf_utils.optimize_ir = function(ir, optimization, max)
             optimized_ir[#optimized_ir + 1] = { "move-to2", ir[i + 1][2], ir[i + 1][3], ir[i + 1][4], ir[i + 1][5] - ir[i][3], ir[i + 1][6] - ir[i][3] }
             optimized_ir[#optimized_ir + 1] = { "<", ir[i][2], ir[i][3] }
             i = i + 2
+        elseif -- swap > with +1→2
+            ir[i][1] == ">" and
+            ir[i + 1][1] == "+1→2"
+        then
+            optimized_ir[#optimized_ir + 1] = { "+1→2", ir[i + 1][2], ir[i + 1][3] + ir[i][3], ir[i + 1][4] + ir[i][3], ir[i + 1][5] }
+            optimized_ir[#optimized_ir + 1] = { ">", ir[i][2], ir[i][3] }
+            i = i + 2
+        elseif -- swap < with +1→2
+            ir[i][1] == "<" and
+            ir[i + 1][1] == "+1→2"
+        then
+            optimized_ir[#optimized_ir + 1] = { "+1→2", ir[i + 1][2], ir[i + 1][3] - ir[i][3], ir[i + 1][4] - ir[i][3], ir[i + 1][5] }
+            optimized_ir[#optimized_ir + 1] = { "<", ir[i][2], ir[i][3] }
+            i = i + 2
         elseif -- combine + with add-to2
             ir[i][1] == "+" and
             ir[i + 1][1] == "add-to2" and
@@ -1153,6 +1168,14 @@ bf_utils.optimize_ir = function(ir, optimization, max)
             ir[i][4] == ir[i + 1][4]
         then
             optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], (ir[i + 1][3] or 0) + ir[i][3], ir[i + 1][4] }
+            i = i + 2
+        elseif -- combine +1→2 and +1→2
+            ir[i][1] == "+1→2" and
+            ir[i + 1][1] == "+1→2" and
+            ir[i][3] == ir[i + 1][3] and
+            ir[i][4] == ir[i + 1][4]
+        then
+            optimized_ir[#optimized_ir + 1] = { ir[i][1], ir[i][2], ir[i][3], ir[i][4], ir[i][5] + ir[i + 1][5] }
             i = i + 2
         elseif -- combine - and -
             ir[i][1] == "-" and
@@ -1585,10 +1608,10 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
             output_write("local x = data[ptr] + max * data[ptr + 1] - 1\n")
             output_write("data[ptr] = x % max\n")
             output_write("data[ptr + 1] = (x // max)" .. mod_max .. "\n")
-        elseif command == "plus_1_2nc" then
-            output_write("local x = data[ptr - 1] + max * data[ptr + 2] + 1\n")
-            output_write("data[ptr - 1] = x % max\n")
-            output_write("data[ptr + 2] = (x // max)" .. mod_max .. "\n")
+        elseif command == "+1→2" then
+            output_write("local x = data[ptr" .. ptr_offset(ir[i][3]) .. "] + max * data[ptr" .. ptr_offset(ir[i][4]) .. "]" .. ptr_offset(ir[i][5]) .. "\n")
+            output_write("data[ptr" .. ptr_offset(ir[i][3]) .. "] = x % max\n")
+            output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = (x // max)" .. mod_max .. "\n")
         elseif command == "minus_1_2nc" then
             output_write("local x = data[ptr] + max * data[ptr + 3] - 1\n")
             output_write("data[ptr] = x % max\n")
