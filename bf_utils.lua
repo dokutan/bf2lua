@@ -17,7 +17,7 @@ local fast_math_snippets = {
     -- https://esolangs.org/wiki/Brainfuck_bitwidth_conversions 1→2 No Copy
     plus_1_2nc = "+<+[>-]>[->>+<]",
     minus_1_2nc = "+<[>-]>[->>-<]<<-",
-    is_zero_1_2nc = ">+<[>-]>[->+>[<-]<[<]>[-<+>]]<-",
+    is_zero_1_2nc = "+<[>-]>[->+>[<-]<[<]>[-<+>]]<-",
 
     -- https://esolangs.org/wiki/Brainfuck_bitwidth_conversions 1→2 Compact Copy
     plus_1_2cc = "+>+[<->[->>+<<]]>>[-<<+>>]<<<[->>+<<]",
@@ -203,8 +203,7 @@ bf_utils.convert_brainfuck = function(program, optimization)
             i = i + contains_at_bf(program, i, fast_math_snippets.minus_1_2nc)
 
         elseif use_fast_math and contains_at_bf(program, i, fast_math_snippets.is_zero_1_2nc) then
-            ir[#ir + 1] = { "is_zero_1_2nc", loops }
-            ir[#ir + 1] = { ">", loops, 1 }
+            ir[#ir + 1] = { "is_zero_1_2nc", loops, -1, 2, 0 }
             i = i + contains_at_bf(program, i, fast_math_snippets.is_zero_1_2nc)
 
         elseif use_fast_math and contains_at_bf(program, i, fast_math_snippets.plus_1_2cc) then
@@ -1059,6 +1058,20 @@ bf_utils.optimize_ir = function(ir, optimization, max)
             optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3] - ir[i][3], ir[i + 1][4] - ir[i][3], ir[i + 1][5] }
             optimized_ir[#optimized_ir + 1] = { "<", ir[i][2], ir[i][3] }
             i = i + 2
+        elseif -- swap > with is_zero_1_2nc
+            ir[i][1] == ">" and
+            ir[i + 1][1] == "is_zero_1_2nc"
+        then
+            optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3] + ir[i][3], ir[i + 1][4] + ir[i][3], ir[i + 1][5] + ir[i][3] }
+            optimized_ir[#optimized_ir + 1] = { ">", ir[i][2], ir[i][3] }
+            i = i + 2
+        elseif -- swap < with is_zero_1_2nc
+            ir[i][1] == "<" and
+            ir[i + 1][1] == "is_zero_1_2nc"
+        then
+            optimized_ir[#optimized_ir + 1] = { ir[i + 1][1], ir[i + 1][2], ir[i + 1][3] - ir[i][3], ir[i + 1][4] - ir[i][3], ir[i + 1][5] - ir[i][3] }
+            optimized_ir[#optimized_ir + 1] = { "<", ir[i][2], ir[i][3] }
+            i = i + 2
         elseif -- combine + with add-to2
             ir[i][1] == "+" and
             ir[i + 1][1] == "add-to2" and
@@ -1613,7 +1626,7 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
             output_write("data[ptr" .. ptr_offset(ir[i][3]) .. "] = x % max\n")
             output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = (x // max)" .. mod_max .. "\n")
         elseif command == "is_zero_1_2nc" then
-            output_write("if data[ptr] ~= 0 or data[ptr + 3] ~= 0 then data[ptr + 1] = " .. (-1 % (maximum + 1)) .. " else data[ptr + 1] = 0 end\n")
+            output_write("if data[ptr" .. ptr_offset(ir[i][3]) .. "] ~= 0 or data[ptr" .. ptr_offset(ir[i][4]) .. "] ~= 0 then data[ptr" .. ptr_offset(ir[i][5]) .. "] = " .. (-1 % (maximum + 1)) .. " else data[ptr" .. ptr_offset(ir[i][5]) .. "] = 0 end\n")
         elseif command == "#" and debugging then
             output_write("bf_debug()\n")
         end
