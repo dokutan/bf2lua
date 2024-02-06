@@ -149,6 +149,7 @@ end
 --- * {"print%1000", indentation depth}
 --- * {"+1→2", indentation depth, ptr offset low, ptr offset high, value}
 --- * {"-1→2", indentation depth, ptr offset low, ptr offset high, value}
+--- * {"add_to_1→2", indentation depth, ptr offset to low, ptr offset to high, ptr offset from} (add a normal cell to a doubled cell)
 --- @tparam string program brainfuck program
 --- @tparam int optimization optimization level
 --- @treturn table intermediate representation
@@ -1344,6 +1345,19 @@ bf_utils.optimize_ir = function(ir, optimization, max)
             optimized_ir[#optimized_ir + 1] = { ir[i + 3][1], ir[i + 3][2] }
             optimized_ir[#optimized_ir + 1] = { ir[i][1], ir[i][2], ir[i][3] }
             i = i + 4
+        elseif -- [ +1→2 - ] → add_to_1→2
+            ir[i][1] == "[" and
+            ir[i + 1][1] == "+1→2" and
+            ir[i + 2][1] == "-" and
+            ir[i + 3][1] == "]" and
+            ir[i + 1][5] == 1 and --value
+            ir[i + 2][3] == 1 and --value
+            ir[i + 1][3] ~= ir[i + 2][4] and
+            ir[i + 1][4] ~= ir[i + 2][4]
+        then
+            optimized_ir[#optimized_ir + 1] = { "add_to_1→2", ir[i][2], ir[i + 1][3], ir[i + 1][4], ir[i + 2][4] }
+            optimized_ir[#optimized_ir + 1] = { "=", ir[i][2], 0, ir[i + 2][4] }
+            i = i + 4
         else -- no optimisation applicable
             optimized_ir[#optimized_ir + 1] = ir[i]
             i = i + 1
@@ -1618,15 +1632,25 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
         elseif command == "print_number" then
             output_write("io.write(data[ptr])\n")
         elseif command == "+1→2" then
-            output_write("local x = data[ptr" .. ptr_offset(ir[i][3]) .. "] + max * data[ptr" .. ptr_offset(ir[i][4]) .. "]" .. ptr_offset(ir[i][5]) .. "\n")
-            output_write("data[ptr" .. ptr_offset(ir[i][3]) .. "] = x % max\n")
-            output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = (x // max)" .. mod_max .. "\n")
+            output_write(
+                "local x = data[ptr" .. ptr_offset(ir[i][3]) .. "] + max * data[ptr" .. ptr_offset(ir[i][4]) .. "]" .. ptr_offset(ir[i][5]) .. "; " ..
+                "data[ptr" .. ptr_offset(ir[i][3]) .. "] = x % max; " ..
+                "data[ptr" .. ptr_offset(ir[i][4]) .. "] = (x // max)" .. mod_max .. "\n"
+            )
         elseif command == "-1→2" then
-            output_write("local x = data[ptr" .. ptr_offset(ir[i][3]) .. "] + max * data[ptr" .. ptr_offset(ir[i][4]) .. "]" .. ptr_offset(-ir[i][5]) .. "\n")
-            output_write("data[ptr" .. ptr_offset(ir[i][3]) .. "] = x % max\n")
-            output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = (x // max)" .. mod_max .. "\n")
+            output_write(
+                "local x = data[ptr" .. ptr_offset(ir[i][3]) .. "] + max * data[ptr" .. ptr_offset(ir[i][4]) .. "]" .. ptr_offset(-ir[i][5]) .. "; " ..
+                "data[ptr" .. ptr_offset(ir[i][3]) .. "] = x % max; " ..
+                "data[ptr" .. ptr_offset(ir[i][4]) .. "] = (x // max)" .. mod_max .. "\n"
+            )
         elseif command == "is_zero_1_2nc" then
             output_write("if data[ptr" .. ptr_offset(ir[i][3]) .. "] ~= 0 or data[ptr" .. ptr_offset(ir[i][4]) .. "] ~= 0 then data[ptr" .. ptr_offset(ir[i][5]) .. "] = " .. (-1 % (maximum + 1)) .. " else data[ptr" .. ptr_offset(ir[i][5]) .. "] = 0 end\n")
+        elseif command == "add_to_1→2" then
+            output_write(
+                "local x = data[ptr" .. ptr_offset(ir[i][3]) .. "] + max * data[ptr" .. ptr_offset(ir[i][4]) .. "] + data[ptr" .. ptr_offset(ir[i][5]) .. "]; " ..
+                "data[ptr" .. ptr_offset(ir[i][3]) .. "] = x % max; " ..
+                "data[ptr" .. ptr_offset(ir[i][4]) .. "] = (x // max)" .. mod_max .. "\n"
+            )
         elseif command == "#" and debugging then
             output_write("bf_debug()\n")
         end
