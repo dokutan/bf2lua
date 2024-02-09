@@ -1374,19 +1374,27 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
                 ptr_offset(ir[i][3] or 0) .. ")" .. mod_max .. "))\n"
             )
         elseif command == "+" then
-            output_write(
-                "data[ptr" .. ptr_offset(ir[i][4]) ..
-                "] = (data[ptr" .. ptr_offset(ir[i][4]) .. "] + " .. ir[i][3] .. ")" .. mod_max .. "\n"
-            )
+            if maximum > 0 then
+                output_write(
+                    "data[ptr" .. ptr_offset(ir[i][4]) ..
+                    "] = (data[ptr" .. ptr_offset(ir[i][4]) .. "] + " .. ir[i][3] .. ")" .. mod_max .. "\n"
+                )
+            else
+                output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] += " .. ir[i][3] .. "\n")
+            end
         elseif command == "-" then
-            output_write(
-                "data[ptr" .. ptr_offset(ir[i][4]) ..
-                "] = (data[ptr" .. ptr_offset(ir[i][4]) .. "] - " .. ir[i][3] .. ")" .. mod_max .. "\n"
-            )
+            if maximum > 0 then
+                output_write(
+                    "data[ptr" .. ptr_offset(ir[i][4]) ..
+                    "] = (data[ptr" .. ptr_offset(ir[i][4]) .. "] - " .. ir[i][3] .. ")" .. mod_max .. "\n"
+                )
+            else
+                output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] -= " .. ir[i][3] .. "\n")
+            end
         elseif command == "<" then
-            output_write("ptr = ptr - " .. ir[i][3] .. "\n")
+            output_write("ptr -= " .. ir[i][3] .. "\n")
         elseif command == ">" then
-            output_write("ptr = ptr + " .. ir[i][3] .. "\n")
+            output_write("ptr += " .. ir[i][3] .. "\n")
         elseif command == "=" then
             if maximum > 0 then
                 output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = " .. (ir[i][3] % (maximum + 1)) .. "\n") -- TODO! add option to disable this
