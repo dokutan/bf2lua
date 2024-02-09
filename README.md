@@ -26,7 +26,7 @@ If you are using luajit or Lua < 5.4, the ``-f`` option can improve compatibilit
 lua bf2.lua -f -i input.bf
 ```
 
-Set the optimization level (0-2, default is 1) with the ``-O`` option:
+Set the optimization level (0-3, default is 1) with the ``-O`` option:
 ```sh
 lua bf2.lua -O 2 -i input.bf
 ```
