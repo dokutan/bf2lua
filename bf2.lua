@@ -27,13 +27,13 @@ Options:
 ]]
 
 local output_header = [[
-#!/usr/bin/env lua
-local data = {}
-local ptr = 1
-local max = %d
+#include <stdio.h>
+#include <stdint.h>
 
-setmetatable(data, {__index = function() return 0 end})
+char data[30000];
+unsigned int ptr = 0;
 
+int main(){
 ]]
 
 local debug_header = [[

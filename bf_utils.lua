@@ -1339,60 +1339,32 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
 
     for i = 1, #ir do
         local command = ir[i][1]
-        local loops = ir[i][2]
+        local loops = (ir[i][2] or 0) + 1
 
         local output_write = function(str)
             lua_code = lua_code .. string.rep("\t", loops) .. str
         end
 
         if command == "[" then
-            output_write("while data[ptr" .. ptr_offset(ir[i][4]) .. "] ~= 0 do\n")
-
-            if functions then
-                output_write("function loop" .. function_counter .. "()\n")
-                function_names[loops] = function_counter
-                function_counter = function_counter + 1
-            end
+            output_write("while(data[ptr" .. ptr_offset(ir[i][4]) .. "]){\n")
         elseif command == "if" then
-            output_write("if data[ptr" .. ptr_offset(ir[i][4]) .. "] ~= 0 then\n")
-            if functions then
-                output_write("function loop" .. function_counter .. "()\n")
-                function_names[loops] = function_counter
-                function_counter = function_counter + 1
-            end
+            output_write("if(data[ptr" .. ptr_offset(ir[i][4]) .. "]){\n")
         elseif command == "]" then
-            output_write("end\n")
-            if functions then
-                output_write("loop" .. function_names[loops] .. "()\n")
-                output_write("end\n")
-            end
+            output_write("}\n")
         elseif command == "," then
-            output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = string.byte(io.read(1) or 0)\n")
+            output_write("//data[ptr" .. ptr_offset(ir[i][4]) .. "] = string.byte(io.read(1) or 0)\n")
         elseif command == "." then
-            output_write(
-                "io.write(string.char((data[ptr" .. ptr_offset(ir[i][4]) .. "]" ..
-                ptr_offset(ir[i][3] or 0) .. ")" .. mod_max .. "))\n"
-            )
+            output_write("putchar(data[ptr" .. ptr_offset(ir[i][4]) .. "]" .. ptr_offset(ir[i][3] or 0) .. ");\n")
         elseif command == "+" then
-            output_write(
-                "data[ptr" .. ptr_offset(ir[i][4]) ..
-                "] = (data[ptr" .. ptr_offset(ir[i][4]) .. "] + " .. ir[i][3] .. ")" .. mod_max .. "\n"
-            )
+            output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = (data[ptr" .. ptr_offset(ir[i][4]) .. "] + " .. ir[i][3] .. ");\n")
         elseif command == "-" then
-            output_write(
-                "data[ptr" .. ptr_offset(ir[i][4]) ..
-                "] = (data[ptr" .. ptr_offset(ir[i][4]) .. "] - " .. ir[i][3] .. ")" .. mod_max .. "\n"
-            )
+            output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = (data[ptr" .. ptr_offset(ir[i][4]) .. "] - " .. ir[i][3] .. ");\n")
         elseif command == "<" then
-            output_write("ptr = ptr - " .. ir[i][3] .. "\n")
+            output_write("ptr -= " .. ir[i][3] .. ";\n")
         elseif command == ">" then
-            output_write("ptr = ptr + " .. ir[i][3] .. "\n")
+            output_write("ptr += " .. ir[i][3] .. ";\n")
         elseif command == "=" then
-            if maximum > 0 then
-                output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = " .. (ir[i][3] % (maximum + 1)) .. "\n") -- TODO! add option to disable this
-            else
-                output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = " .. ir[i][3] .. mod_max .. "\n")
-            end
+            output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = " .. ir[i][3] .. ";\n")
         elseif command == "add-to2" then
             local add = ""
             if ir[i][3] > 0 then
@@ -1413,7 +1385,7 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
             end
 
             output_write(
-                "data[ptr" .. ptr_offset(ir[i][5]) .. "] = (data[ptr" .. ptr_offset(ir[i][5]) .. "] " .. add .. multiply .. "data[ptr" .. ptr_offset(ir[i][6]) .. "])" .. mod_max .. "\n"
+                "data[ptr" .. ptr_offset(ir[i][5]) .. "] = (data[ptr" .. ptr_offset(ir[i][5]) .. "] " .. add .. multiply .. "data[ptr" .. ptr_offset(ir[i][6]) .. "]);\n"
             )
         elseif command == "move-to2" then
             local add = ""
@@ -1432,11 +1404,11 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
 
             if add == "" and multiply == "" then
                 output_write(
-                    "data[ptr" .. ptr_offset(ir[i][5]) .. "] = data[ptr" .. ptr_offset(ir[i][6]) .. "]\n"
+                    "data[ptr" .. ptr_offset(ir[i][5]) .. "] = data[ptr" .. ptr_offset(ir[i][6]) .. "];\n"
                 )
             else
                 output_write(
-                    "data[ptr" .. ptr_offset(ir[i][5]) .. "] = (" .. multiply .. "data[ptr" .. ptr_offset(ir[i][6]) .. "]" .. add .. ")" .. mod_max .. "\n"
+                    "data[ptr" .. ptr_offset(ir[i][5]) .. "] = (" .. multiply .. "data[ptr" .. ptr_offset(ir[i][6]) .. "]" .. add .. ");\n"
                 )
             end
         elseif command == "print" then
@@ -1456,13 +1428,13 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
                 end
                 bytes = bytes .. byte
             end
-            output_write("io.write(\"" .. bytes .. "\")\n")
+            output_write("puts(\"" .. bytes .. "\");\n")
         elseif command == "#" and debugging then
-            output_write("bf_debug()\n")
+            output_write("// bf_debug();\n")
         end
     end
 
-    return lua_code
+    return lua_code .. "}\n"
 end
 
 return bf_utils
