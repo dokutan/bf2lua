@@ -372,6 +372,41 @@ bf_utils.optimize_ir = function(ir, optimization, max)
             end
         end
 
+        if -- is_zero_1_2nc ≶ while → while_1→2
+            ir[i][1] == "is_zero_1_2nc" and
+            ir[i + 2][1] == "[" and
+            ir[i + 2][4] == 0   and -- [: ptr offset = 0
+            ((ir[i + 1][1] == ">" and ir[i][5] == ir[i + 1][3]) or -- is_zero_1_2nc sets ptr at loop
+             (ir[i + 1][1] == "<" and ir[i][5] == -ir[i + 1][3]))
+        then
+            print("ok")
+
+            optimized_ir[#optimized_ir + 1] = ir[i + 1]
+            optimized_ir[#optimized_ir + 1] = { "while_1→2", ir[i][2], -1, 2 } -- TODO calculate ptr offsets and allow loop offset ≠ 0
+            optimized_ir[#optimized_ir + 1] = { "=", ir[i][2] + 1, (-1 % (max + 1)), 0 }
+
+            local loop_depth = 1
+            i = i + 3
+            for j = i, #ir do
+                if ir[j][1] == "if" or ir[j][1] == "[" or ir[j][1] == "while_1→2" then
+                    loop_depth = loop_depth + 1
+                    optimized_ir[#optimized_ir + 1] = ir[j]
+                    i = i + 1
+                elseif ir[j][1] == "]" and loop_depth == 1 then
+                    i = i + 1
+                    optimized_ir[#optimized_ir + 1] = ir[j]
+                    break
+                elseif ir[j][1] == "]" then
+                    optimized_ir[#optimized_ir + 1] = ir[j]
+                    i = i + 1
+                    loop_depth = loop_depth - 1
+                else
+                    optimized_ir[#optimized_ir + 1] = ir[j]
+                    i = i + 1
+                end
+            end
+        end
+
         if -- loop → add-to2
             ir[i][1] == "["
         then
@@ -1651,6 +1686,8 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
                 "data[ptr" .. ptr_offset(ir[i][3]) .. "] = x % max; " ..
                 "data[ptr" .. ptr_offset(ir[i][4]) .. "] = (x // max)" .. mod_max .. "\n"
             )
+        elseif command == "while_1→2" then
+            output_write("while data[ptr" .. ptr_offset(ir[i][3]) .. "] ~= 0 or data[ptr" .. ptr_offset(ir[i][4]) .. "] ~= 0 do\n")
         elseif command == "#" and debugging then
             output_write("bf_debug()\n")
         end
