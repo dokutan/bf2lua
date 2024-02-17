@@ -1428,7 +1428,7 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
                 end
                 bytes = bytes .. byte
             end
-            output_write("puts(\"" .. bytes .. "\");\n")
+            output_write("printf(\"" .. bytes .. "\");\n")
         elseif command == "#" and debugging then
             output_write("// bf_debug();\n")
         end
