@@ -1,0 +1,3 @@
+[submodule "typed-fennel"]
+	path = typed-fennel
+	url = https://github.com/dokutan/typed-fennel
