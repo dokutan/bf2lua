@@ -1356,9 +1356,9 @@ bf_utils.convert_ir = function(ir, functions, debugging, maximum, output_header,
         elseif command == "." then
             output_write("putchar(data[ptr" .. ptr_offset(ir[i][4]) .. "]" .. ptr_offset(ir[i][3] or 0) .. ");\n")
         elseif command == "+" then
-            output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = (data[ptr" .. ptr_offset(ir[i][4]) .. "] + " .. ir[i][3] .. ");\n")
+            output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] += " .. ir[i][3] .. ";\n")
         elseif command == "-" then
-            output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] = (data[ptr" .. ptr_offset(ir[i][4]) .. "] - " .. ir[i][3] .. ");\n")
+            output_write("data[ptr" .. ptr_offset(ir[i][4]) .. "] -= " .. ir[i][3] .. ";\n")
         elseif command == "<" then
             output_write("ptr -= " .. ir[i][3] .. ";\n")
         elseif command == ">" then
